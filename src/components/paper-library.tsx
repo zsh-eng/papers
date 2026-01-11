@@ -7,6 +7,7 @@ import type { Paper } from "@/lib/papers";
 interface PaperLibraryProps {
   workspacePath: string;
   onChangeWorkspace: () => void;
+  onSelectPaper: (paper: Paper) => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -15,7 +16,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function PaperItem({ paper }: { paper: Paper }) {
+function PaperItem({ paper, onClick }: { paper: Paper; onClick: () => void }) {
   const { metadata } = paper;
   const displayTitle = metadata.title || paper.filename;
   const displayAuthors =
@@ -26,7 +27,18 @@ function PaperItem({ paper }: { paper: Paper }) {
       : null;
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer">
+    <div
+      className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
         <FileText className="w-5 h-5 text-primary" />
       </div>
@@ -49,6 +61,7 @@ function PaperItem({ paper }: { paper: Paper }) {
 export function PaperLibrary({
   workspacePath,
   onChangeWorkspace,
+  onSelectPaper,
 }: PaperLibraryProps) {
   const { papers, isLoading, error, importFromPaths, refresh } =
     usePapers(workspacePath);
@@ -113,7 +126,13 @@ export function PaperLibrary({
                 </p>
               </div>
             ) : (
-              papers.map((paper) => <PaperItem key={paper.id} paper={paper} />)
+              papers.map((paper) => (
+                <PaperItem
+                  key={paper.id}
+                  paper={paper}
+                  onClick={() => onSelectPaper(paper)}
+                />
+              ))
             )}
           </div>
         </div>

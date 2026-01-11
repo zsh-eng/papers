@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { Onboarding } from "@/components/onboarding";
 import { PaperLibrary } from "@/components/paper-library";
+import { PaperReader } from "@/components/paper-reader";
+import type { Paper } from "@/lib/papers";
 
 function LoadingScreen() {
   return (
@@ -12,6 +15,7 @@ function LoadingScreen() {
 
 export function App() {
   const { workspacePath, isLoading, setWorkspace, clearWorkspace } = useWorkspace();
+  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -21,10 +25,21 @@ export function App() {
     return <Onboarding onComplete={setWorkspace} />;
   }
 
+  // Show paper reader if a paper is selected
+  if (selectedPaper) {
+    return (
+      <PaperReader
+        paper={selectedPaper}
+        onBack={() => setSelectedPaper(null)}
+      />
+    );
+  }
+
   return (
     <PaperLibrary
       workspacePath={workspacePath}
       onChangeWorkspace={clearWorkspace}
+      onSelectPaper={setSelectedPaper}
     />
   );
 }
