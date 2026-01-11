@@ -17,6 +17,8 @@
     "fs:allow-rename",
     "fs:allow-stat",
     "fs:allow-write-text-file",
-    "dialog:default"
+    "fs:allow-copy-file",
+    "dialog:default",
+    "store:default"
   ]
 }
