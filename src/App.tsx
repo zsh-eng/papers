@@ -1,7 +1,7 @@
-import { ComponentExample } from "@/components/component-example";
+import { FileExplorer } from "@/components/file-explorer";
 
 export function App() {
-return <ComponentExample />;
+  return <FileExplorer />;
 }
 
 export default App;
