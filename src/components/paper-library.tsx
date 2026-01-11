@@ -15,24 +15,31 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function PaperItem({ paper }: { paper: Paper }) {
+  const { metadata } = paper;
+  const displayTitle = metadata.title || paper.filename;
+  const displayAuthors =
+    metadata.authors.length > 0
+      ? metadata.authors.length > 2
+        ? `${metadata.authors[0]} et al.`
+        : metadata.authors.join(", ")
+      : null;
+
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer">
       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
         <FileText className="w-5 h-5 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate">{paper.filename}</p>
-        <p className="text-xs text-muted-foreground">
-          {formatFileSize(paper.size)} • Added {formatDate(paper.addedAt)}
+        <p className="font-medium text-sm truncate" title={displayTitle}>
+          {displayTitle}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">
+          {displayAuthors && <span>{displayAuthors}</span>}
+          {displayAuthors && metadata.year && <span> • </span>}
+          {metadata.year && <span>{metadata.year}</span>}
+          {(displayAuthors || metadata.year) && <span> • </span>}
+          {formatFileSize(paper.size)}
         </p>
       </div>
     </div>
