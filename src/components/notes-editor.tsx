@@ -90,23 +90,63 @@ const obsidianTheme = EditorView.theme({
     fontStyle: "italic",
   },
 
-  // Blockquote
+  // Blockquote - just vertical border, no extra indent
   ".cm-blockquote-line": {
     borderLeft: "2px solid var(--border)",
-    paddingLeft: "1rem",
+    marginLeft: "0",
+    paddingLeft: "0.75rem",
   },
   ".cm-blockquote": {
     color: "var(--muted-foreground)",
     fontStyle: "italic",
   },
 
-  // Lists
+  // Lists - base bullet style
   ".cm-list-bullet": {
     color: "var(--muted-foreground)",
     fontWeight: "bold",
-    display: "inline-block",
-    width: "1.5em",
+    display: "inline",
+    width: "1em",
+    paddingRight: "0.25em",
     textAlign: "center",
+  },
+
+  // List line styling for proper indentation, hanging indent, and borders
+  ".cm-list-line": {
+    // Hanging indent: text-indent pulls first line left, padding-left pushes all content right
+    // This makes wrapped lines align with the text after the bullet
+    textIndent: "-1.5em",
+    paddingLeft: "1.5em",
+  },
+
+  // Nested list indentation levels with vertical borders
+  ".cm-list-indent-0": {
+    marginLeft: "0",
+  },
+  ".cm-list-indent-1": {
+    marginLeft: "1.5em",
+    borderLeft: "1px solid var(--border)",
+    paddingLeft: "calc(1.5em + 0.5em)", // hanging indent + border padding
+  },
+  ".cm-list-indent-2": {
+    marginLeft: "3em",
+    borderLeft: "1px solid var(--border)",
+    paddingLeft: "calc(1.5em + 0.5em)",
+  },
+  ".cm-list-indent-3": {
+    marginLeft: "4.5em",
+    borderLeft: "1px solid var(--border)",
+    paddingLeft: "calc(1.5em + 0.5em)",
+  },
+  ".cm-list-indent-4": {
+    marginLeft: "6em",
+    borderLeft: "1px solid var(--border)",
+    paddingLeft: "calc(1.5em + 0.5em)",
+  },
+  ".cm-list-indent-5": {
+    marginLeft: "7.5em",
+    borderLeft: "1px solid var(--border)",
+    paddingLeft: "calc(1.5em + 0.5em)",
   },
 
   // Inline code
@@ -173,6 +213,26 @@ const obsidianTheme = EditorView.theme({
   },
 });
 
+// Click handler for links
+const linkClickHandler = EditorView.domEventHandlers({
+  click: (event) => {
+    const target = event.target as HTMLElement;
+
+    // Check if clicked on link text or autolink
+    const linkElement = target.closest(".cm-link-text, .cm-autolink");
+    if (linkElement) {
+      const url = linkElement.getAttribute("data-url");
+      if (url) {
+        event.preventDefault();
+        window.open(url, "_blank", "noopener,noreferrer");
+        return true;
+      }
+    }
+
+    return false;
+  },
+});
+
 export function NotesEditor({
   value: initialValue,
   onChange,
@@ -213,6 +273,7 @@ export function NotesEditor({
           { key: "Shift-Tab", run: indentLess },
         ]),
         obsidianTheme,
+        linkClickHandler,
         updateListener,
         EditorView.lineWrapping,
         placeholder

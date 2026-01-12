@@ -15,27 +15,18 @@ import {
 
 /**
  * Bullet point widget - renders "•" for list items
+ * The indentation is handled by line decorations, not the widget itself
  */
 class BulletWidget extends WidgetType {
-  indent: number;
-
-  constructor(indent = 0) {
-    super();
-    this.indent = indent;
-  }
-
   toDOM() {
     const span = document.createElement("span");
     span.className = "cm-list-bullet";
     span.textContent = "•";
-    if (this.indent > 0) {
-      span.style.marginLeft = `${this.indent * 1.5}em`;
-    }
     return span;
   }
 
-  eq(other: BulletWidget) {
-    return this.indent === other.indent;
+  eq() {
+    return true;
   }
 }
 
@@ -43,15 +34,27 @@ class BulletWidget extends WidgetType {
  * Link icon widget - inline SVG external link icon
  */
 class LinkIconWidget extends WidgetType {
+  url: string;
+
+  constructor(url: string) {
+    super();
+    this.url = url;
+  }
+
   toDOM() {
     const span = document.createElement("span");
     span.className = "cm-link-icon";
     span.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
+    span.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(this.url, "_blank", "noopener,noreferrer");
+    });
     return span;
   }
 
-  eq() {
-    return true;
+  eq(other: LinkIconWidget) {
+    return this.url === other.url;
   }
 }
 
@@ -138,8 +141,6 @@ const headingDecorations: Record<number, Decoration> = {
 const strongDecoration = Decoration.mark({ class: "cm-strong" });
 const emphasisDecoration = Decoration.mark({ class: "cm-em" });
 const inlineCodeDecoration = Decoration.mark({ class: "cm-inline-code" });
-const linkTextDecoration = Decoration.mark({ class: "cm-link-text" });
-const autolinkDecoration = Decoration.mark({ class: "cm-autolink" });
 const blockquoteDecoration = Decoration.mark({ class: "cm-blockquote" });
 const blockquoteLineDecoration = Decoration.line({
   class: "cm-blockquote-line",
@@ -427,13 +428,29 @@ class ObsidianModePlugin {
         // ---------------------------------------------------------------------
         if (name === "ListMark") {
           const indent = getListIndentLevel(node.node);
+          const line = doc.lineAt(from);
 
           // Find the full mark including trailing space
           const afterMark = doc.sliceString(to, Math.min(to + 1, doc.length));
           const hideEnd = afterMark === " " ? to + 1 : to;
 
-          // Only show the original mark when cursor is within or right next to the marker
-          const cursorNearMark = isCursorInRange(cursor, from, hideEnd);
+          // Only show the original mark when cursor is directly on or adjacent to the dash
+          // (not when cursor is on the space after the dash)
+          // Cursor should be at: from (left of dash), from+1 (on dash for single char marks), or to (right of dash)
+          const cursorNearMark = cursor >= from && cursor <= to;
+
+          // Add line decoration for indentation and borders
+          const lineKey = `list-line-${line.number}`;
+          if (!processedRanges.has(lineKey)) {
+            processedRanges.add(lineKey);
+            decorations.push({
+              from: line.from,
+              to: line.from,
+              decoration: Decoration.line({
+                class: `cm-list-line cm-list-indent-${indent}`,
+              }),
+            });
+          }
 
           if (!cursorNearMark) {
             // Replace the list mark with a bullet widget
@@ -441,7 +458,7 @@ class ObsidianModePlugin {
               from,
               hideEnd,
               Decoration.replace({
-                widget: new BulletWidget(indent),
+                widget: new BulletWidget(),
               }),
             );
           } else {
@@ -459,6 +476,7 @@ class ObsidianModePlugin {
           // Parse the link structure
           let linkTextStart = -1;
           let linkTextEnd = -1;
+          let linkUrl = "";
 
           // Find child nodes
           const linkNode = node.node;
@@ -471,13 +489,22 @@ class ObsidianModePlugin {
               } else if (markText === "]") {
                 linkTextEnd = child.from;
               }
+            } else if (child.name === "URL") {
+              linkUrl = doc.sliceString(child.from, child.to);
             }
             child = child.nextSibling;
           }
 
           if (linkTextStart >= 0 && linkTextEnd > linkTextStart) {
-            // Apply link text styling
-            addDecoration(linkTextStart, linkTextEnd, linkTextDecoration);
+            // Apply link text styling with click handler
+            addDecoration(
+              linkTextStart,
+              linkTextEnd,
+              Decoration.mark({
+                class: "cm-link-text",
+                attributes: { "data-url": linkUrl },
+              }),
+            );
 
             if (!cursorInLink) {
               // Hide [ and ]( and url and )
@@ -492,7 +519,7 @@ class ObsidianModePlugin {
                 from: linkTextEnd,
                 to: linkTextEnd,
                 decoration: Decoration.widget({
-                  widget: new LinkIconWidget(),
+                  widget: new LinkIconWidget(linkUrl),
                   side: 1,
                 }),
               });
@@ -511,7 +538,15 @@ class ObsidianModePlugin {
         // ---------------------------------------------------------------------
         if (name === "URL" && node.node.parent?.name !== "Link") {
           // This is a bare URL, not inside a [text](url) link
-          addDecoration(from, to, autolinkDecoration);
+          const url = doc.sliceString(from, to);
+          addDecoration(
+            from,
+            to,
+            Decoration.mark({
+              class: "cm-autolink",
+              attributes: { "data-url": url },
+            }),
+          );
         }
 
         if (name === "Autolink") {
@@ -523,7 +558,15 @@ class ObsidianModePlugin {
             const contentEnd = to - 1;
 
             if (contentStart < contentEnd) {
-              addDecoration(contentStart, contentEnd, autolinkDecoration);
+              const url = doc.sliceString(contentStart, contentEnd);
+              addDecoration(
+                contentStart,
+                contentEnd,
+                Decoration.mark({
+                  class: "cm-autolink",
+                  attributes: { "data-url": url },
+                }),
+              );
 
               if (!isCursorInRange(cursor, from, to)) {
                 addDecoration(from, contentStart, hiddenDecoration);
