@@ -141,6 +141,9 @@ const inlineCodeDecoration = Decoration.mark({ class: "cm-inline-code" });
 const linkTextDecoration = Decoration.mark({ class: "cm-link-text" });
 const autolinkDecoration = Decoration.mark({ class: "cm-autolink" });
 const blockquoteDecoration = Decoration.mark({ class: "cm-blockquote" });
+const blockquoteLineDecoration = Decoration.line({
+  class: "cm-blockquote-line",
+});
 const codeBlockLineDecoration = Decoration.line({
   class: "cm-code-block-line",
 });
@@ -250,7 +253,8 @@ class ObsidianModePlugin {
                 // Hide the # marks and space
                 addDecoration(line.from, markEnd, hiddenDecoration);
               } else {
-                // Show marks with formatting style
+                // Show marks with heading style (same font size as content) + formatting mark style
+                addDecoration(line.from, markEnd, headingDecorations[level]);
                 addDecoration(line.from, markEnd, formattingMarkDecoration);
               }
             }
@@ -342,7 +346,7 @@ class ObsidianModePlugin {
         // BLOCKQUOTE (> quote)
         // ---------------------------------------------------------------------
         if (name === "Blockquote") {
-          const cursorInBlock = isCursorInRange(cursor, from, to);
+          const cursorLine = doc.lineAt(cursor).number;
 
           // Iterate through each line in the blockquote
           const startLine = doc.lineAt(from).number;
@@ -356,14 +360,18 @@ class ObsidianModePlugin {
             const quoteMatch = lineText.match(/^(\s*>+\s*)/);
             if (quoteMatch) {
               const markEnd = line.from + quoteMatch[0].length;
+              const isCurrentLine = lineNum === cursorLine;
 
-              // Apply blockquote style to the entire line content
+              // Apply blockquote line decoration (with border) to all lines
+              addLineDecoration(line.from, blockquoteLineDecoration);
+
+              // Apply blockquote style to the content
               if (markEnd < line.to) {
                 addDecoration(markEnd, line.to, blockquoteDecoration);
               }
 
-              // Hide or show > based on cursor position in entire blockquote
-              if (!cursorInBlock) {
+              // Only show > on the current cursor line, hide on all other lines
+              if (!isCurrentLine) {
                 addDecoration(line.from, markEnd, hiddenDecoration);
               } else {
                 addDecoration(line.from, markEnd, formattingMarkDecoration);
@@ -418,15 +426,17 @@ class ObsidianModePlugin {
         // LISTS (BulletList / OrderedList)
         // ---------------------------------------------------------------------
         if (name === "ListMark") {
-          const cursorInList = isCursorInRange(cursor, from, to);
           const indent = getListIndentLevel(node.node);
 
-          if (!cursorInList) {
-            // Replace the list mark with a bullet widget
-            // Find the full mark including trailing space
-            const afterMark = doc.sliceString(to, Math.min(to + 1, doc.length));
-            const hideEnd = afterMark === " " ? to + 1 : to;
+          // Find the full mark including trailing space
+          const afterMark = doc.sliceString(to, Math.min(to + 1, doc.length));
+          const hideEnd = afterMark === " " ? to + 1 : to;
 
+          // Only show the original mark when cursor is within or right next to the marker
+          const cursorNearMark = isCursorInRange(cursor, from, hideEnd);
+
+          if (!cursorNearMark) {
+            // Replace the list mark with a bullet widget
             addDecoration(
               from,
               hideEnd,

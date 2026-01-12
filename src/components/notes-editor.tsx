@@ -1,9 +1,19 @@
 import { useEffect, useRef } from "react";
 import { EditorState } from "@codemirror/state";
-import { EditorView, keymap, highlightActiveLine, drawSelection } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import {
+  EditorView,
+  keymap,
+  highlightActiveLine,
+  drawSelection,
+} from "@codemirror/view";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentMore,
+  indentLess,
+} from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { bracketMatching } from "@codemirror/language";
 import { vim } from "@replit/codemirror-vim";
 import { cn } from "@/lib/utils";
 import { obsidianMode } from "@/lib/codemirror/obsidian-mode";
@@ -33,21 +43,13 @@ const obsidianTheme = EditorView.theme({
     maxWidth: "100%",
   },
   ".cm-line": {
-    padding: "2px 0",
+    padding: "1px 0",
   },
   ".cm-activeLine": {
     backgroundColor: "transparent",
   },
   "&.cm-focused": {
     outline: "none",
-  },
-  ".cm-selectionBackground, ::selection": {
-    backgroundColor: "var(--primary) !important",
-    opacity: "0.3",
-  },
-  "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "var(--primary)",
-    opacity: "0.3",
   },
   ".cm-cursor": {
     borderLeftColor: "var(--foreground)",
@@ -89,9 +91,11 @@ const obsidianTheme = EditorView.theme({
   },
 
   // Blockquote
-  ".cm-blockquote": {
+  ".cm-blockquote-line": {
     borderLeft: "2px solid var(--border)",
     paddingLeft: "1rem",
+  },
+  ".cm-blockquote": {
     color: "var(--muted-foreground)",
     fontStyle: "italic",
   },
@@ -125,9 +129,13 @@ const obsidianTheme = EditorView.theme({
 
   // Links
   ".cm-link-text": {
-    color: "var(--foreground)",
+    color: "hsl(210, 100%, 50%)",
     textDecoration: "underline",
     textUnderlineOffset: "2px",
+    cursor: "pointer",
+  },
+  ".cm-link-text:hover": {
+    color: "hsl(210, 100%, 40%)",
   },
   ".cm-link-icon": {
     opacity: "0.5",
@@ -135,15 +143,20 @@ const obsidianTheme = EditorView.theme({
     verticalAlign: "middle",
     display: "inline-flex",
     alignItems: "center",
+    cursor: "pointer",
   },
   ".cm-link-icon svg": {
     width: "14px",
     height: "14px",
   },
   ".cm-autolink": {
-    color: "var(--chart-1)",
+    color: "hsl(210, 100%, 50%)",
     textDecoration: "underline",
     textUnderlineOffset: "2px",
+    cursor: "pointer",
+  },
+  ".cm-autolink:hover": {
+    color: "hsl(210, 100%, 40%)",
   },
 
   // Horizontal rule
@@ -192,10 +205,13 @@ export function NotesEditor({
         drawSelection(),
         highlightActiveLine(),
         history(),
-        bracketMatching(),
         markdown(),
         obsidianMode,
         keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([
+          { key: "Tab", run: indentMore },
+          { key: "Shift-Tab", run: indentLess },
+        ]),
         obsidianTheme,
         updateListener,
         EditorView.lineWrapping,
