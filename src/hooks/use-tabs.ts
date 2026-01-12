@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type { Paper } from "@/lib/papers";
 
 export interface Tab {
@@ -32,6 +32,12 @@ function createPaperTab(paper: Paper): Tab {
 export function useTabs() {
   const [tabs, setTabs] = useState<Tab[]>(() => [createHomeTab()]);
   const [activeTabId, setActiveTabId] = useState<string>(() => tabs[0].id);
+
+  // Ref to track activeTabId for use in callbacks without causing re-renders
+  const activeTabIdRef = useRef(activeTabId);
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  }, [activeTabId]);
 
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeTabId) ?? tabs[0],
@@ -83,8 +89,8 @@ export function useTabs() {
 
   // Close the currently active tab
   const closeActiveTab = useCallback(() => {
-    closeTab(activeTabId);
-  }, [closeTab, activeTabId]);
+    closeTab(activeTabIdRef.current);
+  }, [closeTab]);
 
   // Switch to a specific tab by ID
   const switchToTab = useCallback((id: string) => {
@@ -104,29 +110,29 @@ export function useTabs() {
   // Cycle to the next tab
   const nextTab = useCallback(() => {
     setTabs((currentTabs) => {
-      const currentIndex = currentTabs.findIndex((t) => t.id === activeTabId);
+      const currentIndex = currentTabs.findIndex((t) => t.id === activeTabIdRef.current);
       const nextIndex = (currentIndex + 1) % currentTabs.length;
       setActiveTabId(currentTabs[nextIndex].id);
       return currentTabs;
     });
-  }, [activeTabId]);
+  }, []);
 
   // Cycle to the previous tab
   const prevTab = useCallback(() => {
     setTabs((currentTabs) => {
-      const currentIndex = currentTabs.findIndex((t) => t.id === activeTabId);
+      const currentIndex = currentTabs.findIndex((t) => t.id === activeTabIdRef.current);
       const prevIndex = (currentIndex - 1 + currentTabs.length) % currentTabs.length;
       setActiveTabId(currentTabs[prevIndex].id);
       return currentTabs;
     });
-  }, [activeTabId]);
+  }, []);
 
   // Update the current tab to show a paper (navigate from home to paper)
   const navigateToPaper = useCallback(
     (paper: Paper) => {
       setTabs((prev) =>
         prev.map((t) =>
-          t.id === activeTabId
+          t.id === activeTabIdRef.current
             ? {
                 ...t,
                 type: "paper" as const,
@@ -137,14 +143,14 @@ export function useTabs() {
         )
       );
     },
-    [activeTabId]
+    []
   );
 
   // Update the current tab to show home (navigate back from paper)
   const navigateToHome = useCallback(() => {
     setTabs((prev) =>
       prev.map((t) =>
-        t.id === activeTabId
+        t.id === activeTabIdRef.current
           ? {
               ...t,
               type: "home" as const,
@@ -154,7 +160,7 @@ export function useTabs() {
           : t
       )
     );
-  }, [activeTabId]);
+  }, []);
 
   return {
     tabs,
