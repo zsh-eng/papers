@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { ArrowLeft, FileText, Save } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, PanelRightOpen, PanelRightClose } from "lucide-react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -27,6 +26,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
 
   // Ref to track pending save timeout
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,44 +131,38 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Back
-          </Button>
-          <div className="h-4 w-px bg-border shrink-0" />
-          <div className="flex items-center gap-2 min-w-0">
-            <FileText className="w-4 h-4 text-primary shrink-0" />
-            <span className="font-medium text-sm truncate" title={paper.metadata.title}>
-              {paper.metadata.title}
-            </span>
-          </div>
+      {/* Minimal navigation - back arrow */}
+      <button
+        onClick={onBack}
+        className="fixed top-6 left-6 z-10 p-2 text-muted-foreground/40 hover:text-foreground transition-colors"
+        aria-label="Go back"
+      >
+        <ArrowLeft className="w-6 h-6" />
+      </button>
+
+      {/* Notes panel toggle */}
+      <button
+        onClick={() => setNotesOpen(!notesOpen)}
+        className="fixed top-6 right-6 z-10 p-2 text-muted-foreground/40 hover:text-foreground transition-colors"
+        aria-label={notesOpen ? "Close notes" : "Open notes"}
+      >
+        {notesOpen ? (
+          <PanelRightClose className="w-5 h-5" />
+        ) : (
+          <PanelRightOpen className="w-5 h-5" />
+        )}
+      </button>
+
+      {/* Save status indicator - subtle */}
+      {(isSaving || lastSaved) && (
+        <div className="fixed top-6 right-16 z-10 text-xs text-muted-foreground/50">
+          {isSaving ? "Saving..." : lastSaved ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : null}
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
-          {isSaving && (
-            <span className="flex items-center gap-1">
-              <Save className="w-3 h-3 animate-pulse" />
-              Saving...
-            </span>
-          )}
-          {lastSaved && !isSaving && (
-            <span>
-              Saved {lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
-        </div>
-      </header>
+      )}
 
       {/* Error banner */}
       {error && (
-        <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm border-b">
+        <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm">
           {error}
           <button
             onClick={() => setError(null)}
@@ -184,12 +178,12 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-muted-foreground animate-pulse">Loading paper...</div>
         </div>
-      ) : (
+      ) : notesOpen ? (
         <ResizablePanelGroup orientation="horizontal" className="flex-1">
           {/* Left panel - Markdown content */}
           <ResizablePanel defaultSize={60} minSize={30} id="content-panel">
             <div className="h-full overflow-auto">
-              <MarkdownViewer content={content} className="p-6 max-w-none" />
+              <MarkdownViewer content={content} className="py-16 px-6" />
             </div>
           </ResizablePanel>
 
@@ -197,8 +191,8 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
 
           {/* Right panel - Notes editor */}
           <ResizablePanel defaultSize={40} minSize={20} id="notes-panel">
-            <div className="h-full flex flex-col border-l">
-              <div className="px-4 py-2 border-b bg-muted/30 shrink-0">
+            <div className="h-full flex flex-col">
+              <div className="px-4 py-3 bg-muted/30 shrink-0">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Notes
                 </span>
@@ -212,6 +206,11 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
+      ) : (
+        /* Full-width content view when notes are closed */
+        <div className="flex-1 overflow-auto">
+          <MarkdownViewer content={content} className="py-16 px-6" />
+        </div>
       )}
     </div>
   );

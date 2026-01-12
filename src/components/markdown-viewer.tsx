@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { renderMarkdownContent } from "@/lib/markdown";
+import { useEffect, useState, useMemo } from "react";
+import { renderMarkdownBody, parseFrontmatter, type ParsedFrontmatter } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 
 interface MarkdownViewerProps {
@@ -12,6 +12,11 @@ export function MarkdownViewer({ content, className }: MarkdownViewerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Parse frontmatter synchronously
+  const frontmatter: ParsedFrontmatter = useMemo(() => {
+    return parseFrontmatter(content);
+  }, [content]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -20,7 +25,7 @@ export function MarkdownViewer({ content, className }: MarkdownViewerProps) {
       setError(null);
 
       try {
-        const rendered = await renderMarkdownContent(content);
+        const rendered = await renderMarkdownBody(content);
         if (!cancelled) {
           setHtml(rendered);
         }
@@ -59,9 +64,26 @@ export function MarkdownViewer({ content, className }: MarkdownViewerProps) {
   }
 
   return (
-    <div
-      className={cn("markdown-content overflow-auto", className)}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <div className={cn("overflow-auto", className)}>
+      <div className="max-w-[700px] mx-auto">
+        {/* Paper title */}
+        {frontmatter.title && (
+          <h1 className="paper-title">{frontmatter.title}</h1>
+        )}
+        
+        {/* Paper authors */}
+        {frontmatter.authors && frontmatter.authors.length > 0 && (
+          <div className="paper-authors">
+            {frontmatter.authors.join(" · ")}
+          </div>
+        )}
+        
+        {/* Paper body */}
+        <div
+          className="markdown-content"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </div>
+    </div>
   );
 }
