@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import { EditorState } from "@codemirror/state";
-import { EditorView, keymap, highlightActiveLine } from "@codemirror/view";
+import { EditorView, keymap, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { bracketMatching } from "@codemirror/language";
+import { vim } from "@replit/codemirror-vim";
 import { cn } from "@/lib/utils";
 import { obsidianMode } from "@/lib/codemirror/obsidian-mode";
 
@@ -187,6 +188,8 @@ export function NotesEditor({
     const state = EditorState.create({
       doc: initialValue,
       extensions: [
+        vim(),
+        drawSelection(),
         highlightActiveLine(),
         history(),
         bracketMatching(),
