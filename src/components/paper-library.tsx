@@ -59,7 +59,7 @@ function PaperRow({
 
   return (
     <div
-      className="grid grid-cols-[4rem_1fr_minmax(12rem,auto)] gap-4 py-3 cursor-pointer border-b border-border/40 items-baseline"
+      className="grid grid-cols-[4rem_1fr_minmax(12rem,auto)] gap-4 py-3 border-b border-border/40 items-baseline"
       onClick={handleClick}
       onMouseEnter={onHover}
       role="button"
@@ -163,7 +163,9 @@ export function PaperLibrary({
             <button
               onClick={toggle}
               className="ml-auto text-sm hover:text-muted-foreground transition-colors"
-              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={
+                isDark ? "Switch to light mode" : "Switch to dark mode"
+              }
               data-no-drag
             >
               {isDark ? "☀" : "☾"}
