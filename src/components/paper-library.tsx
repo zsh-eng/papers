@@ -1,19 +1,13 @@
-import { FileText, FolderOpen, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { DropZone } from "@/components/drop-zone";
 import { usePapers } from "@/hooks/use-papers";
 import type { Paper } from "@/lib/papers";
+import { cn } from "@/lib/utils";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { useEffect, useMemo, useState } from "react";
 
 interface PaperLibraryProps {
   workspacePath: string;
   onChangeWorkspace: () => void;
   onSelectPaper: (paper: Paper) => void;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function PaperItem({ paper, onClick }: { paper: Paper; onClick: () => void }) {
@@ -28,7 +22,7 @@ function PaperItem({ paper, onClick }: { paper: Paper; onClick: () => void }) {
 
   return (
     <div
-      className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+      className="py-4 cursor-pointer group"
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -39,103 +33,124 @@ function PaperItem({ paper, onClick }: { paper: Paper; onClick: () => void }) {
         }
       }}
     >
-      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-        <FileText className="w-5 h-5 text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate" title={displayTitle}>
-          {displayTitle}
+      <p className="font-medium text-foreground group-hover:text-foreground/70 transition-colors">
+        {displayTitle}
+      </p>
+      {displayAuthors && (
+        <p className="text-sm text-muted-foreground mt-1">{displayAuthors}</p>
+      )}
+      {metadata.year && (
+        <p className="text-sm text-muted-foreground/60 mt-0.5">
+          {metadata.year}
         </p>
-        <p className="text-xs text-muted-foreground truncate">
-          {displayAuthors && <span>{displayAuthors}</span>}
-          {displayAuthors && metadata.year && <span> • </span>}
-          {metadata.year && <span>{metadata.year}</span>}
-          {(displayAuthors || metadata.year) && <span> • </span>}
-          {formatFileSize(paper.size)}
-        </p>
-      </div>
+      )}
     </div>
   );
 }
 
 export function PaperLibrary({
   workspacePath,
-  onChangeWorkspace,
   onSelectPaper,
 }: PaperLibraryProps) {
-  const { papers, isLoading, error, importFromPaths, refresh } =
+  const { papers, isLoading, error, importFromPaths } =
     usePapers(workspacePath);
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleDrop = (paths: string[]) => {
-    importFromPaths(paths);
-  };
+  // Sort papers alphabetically by title
+  const sortedPapers = useMemo(() => {
+    return [...papers].sort((a, b) => {
+      const titleA = (a.metadata.title || a.filename).toLowerCase();
+      const titleB = (b.metadata.title || b.filename).toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
+  }, [papers]);
 
-  // Extract workspace folder name
-  const workspaceName = workspacePath.split("/").pop() || workspacePath;
+  // Full-page drag and drop
+  useEffect(() => {
+    const webview = getCurrentWebview();
+
+    const setupListener = async () => {
+      const unlisten = await webview.onDragDropEvent((event) => {
+        if (event.payload.type === "enter" || event.payload.type === "over") {
+          setIsDragOver(true);
+        } else if (event.payload.type === "drop") {
+          setIsDragOver(false);
+
+          const paths = event.payload.paths.filter((path) => {
+            const ext = `.${path.split(".").pop()?.toLowerCase()}`;
+            return ext === ".pdf";
+          });
+
+          if (paths.length > 0) {
+            importFromPaths(paths);
+          }
+        } else if (event.payload.type === "leave") {
+          setIsDragOver(false);
+        }
+      });
+
+      return unlisten;
+    };
+
+    const unlistenPromise = setupListener();
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [importFromPaths]);
+
+  const paperCount = papers.length;
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header - with titlebar inset for traffic lights */}
-      <header className="flex items-center justify-between px-4 py-3 border-b pt-[calc(var(--titlebar-height)+0.75rem)] pl-[var(--traffic-light-padding)]">
-        <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-primary" />
-          <span className="font-semibold">Papers</span>
-          <span className="text-muted-foreground text-sm">•</span>
-          <span className="text-muted-foreground text-sm truncate max-w-[200px]">
-            {workspaceName}
+    <div
+      className={cn(
+        "h-screen flex flex-col transition-colors",
+        isDragOver && "bg-muted/30",
+      )}
+    >
+      {/* Badge - with titlebar inset for traffic lights */}
+      <div className="px-8 pt-[calc(var(--titlebar-height)+1.5rem)]">
+        <div className="flex items-center gap-3 font-mono text-base tracking-widest uppercase text-foreground">
+          <span className="text-foreground text-lg">■</span>
+          <span>
+            {paperCount} {paperCount === 1 ? "PAPER" : "PAPERS"}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refresh}
-            disabled={isLoading}
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
-            />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onChangeWorkspace}>
-            <FolderOpen className="w-4 h-4 mr-1" />
-            Change
-          </Button>
-        </div>
-      </header>
+      </div>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto p-4">
-        <div className="max-w-2xl mx-auto space-y-6">
-          {/* Drop zone */}
-          <DropZone onDrop={handleDrop} className="min-h-[140px]" />
+      <main className="flex-1 overflow-auto px-20 py-8">
+        {/* Error message */}
+        {error && <div className="mb-6 text-sm text-destructive">{error}</div>}
 
-          {/* Error message */}
-          {error && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-              {error}
+        {/* Papers list */}
+        <div className="space-y-1">
+          {sortedPapers.length === 0 && !isLoading ? (
+            <div className="text-muted-foreground">
+              <p className="text-sm">No papers yet</p>
+              <p className="text-xs mt-1 text-muted-foreground/60">
+                Drop PDFs anywhere to get started
+              </p>
             </div>
+          ) : (
+            sortedPapers.map((paper) => (
+              <PaperItem
+                key={paper.id}
+                paper={paper}
+                onClick={() => onSelectPaper(paper)}
+              />
+            ))
           )}
-
-          {/* Papers list */}
-          <div className="space-y-2">
-            {papers.length === 0 && !isLoading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <p className="text-sm">No papers yet</p>
-                <p className="text-xs mt-1">
-                  Drop some PDFs above to get started
-                </p>
-              </div>
-            ) : (
-              papers.map((paper) => (
-                <PaperItem
-                  key={paper.id}
-                  paper={paper}
-                  onClick={() => onSelectPaper(paper)}
-                />
-              ))
-            )}
-          </div>
         </div>
+
+        {/* Drag overlay hint */}
+        {isDragOver && (
+          <div className="fixed inset-0 flex items-center justify-center pointer-events-none">
+            <p className="font-mono text-sm tracking-wide text-muted-foreground">
+              Drop to add
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );
