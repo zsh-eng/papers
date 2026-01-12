@@ -141,6 +141,42 @@
     }
 }
 
+/* Custom titlebar for Tauri - macOS overlay style */
+:root {
+  --titlebar-height: 38px;
+  --traffic-light-padding: 78px; /* Space for macOS traffic lights */
+}
+
+/* Transparent drag region at top of window */
+.titlebar-drag-region {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-height);
+  -webkit-app-region: drag;
+  z-index: 50;
+  pointer-events: auto;
+}
+
+/* Prevent dragging on interactive elements */
+.titlebar-drag-region button,
+.titlebar-drag-region a,
+.titlebar-drag-region input,
+.titlebar-drag-region [data-no-drag] {
+  -webkit-app-region: no-drag;
+}
+
+/* Add padding to account for titlebar in main content */
+.titlebar-inset {
+  padding-top: var(--titlebar-height);
+}
+
+/* Traffic light safe area - use on elements that need to avoid traffic lights */
+.traffic-light-safe {
+  padding-left: var(--traffic-light-padding);
+}
+
 /* Markdown content styling */
 .markdown-content {
   font-family: 'EB Garamond', Georgia, serif;
@@ -155,11 +191,13 @@
 /* Paper title styling */
 .paper-title {
   font-family: 'EB Garamond', Georgia, serif;
-  font-size: 2.5rem;
+  font-size: 3.75rem;
   font-weight: 500;
-  line-height: 1.2;
-  margin-bottom: 1rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: 1.5rem;
   text-align: left;
+  text-wrap: balance;
 }
 
 /* Paper authors styling */
@@ -327,4 +365,56 @@
 /* First heading special styling */
 .markdown-content > h1:first-child {
   margin-top: 0;
+}
+
+/* Progressive blur overlay for paper reader - subtle Paco-style */
+.paper-scroll-container {
+  position: relative;
+}
+
+.paper-scroll-container::before,
+.paper-scroll-container::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 120px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.paper-scroll-container::before {
+  top: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--background) 70%, transparent) 0%,
+    color-mix(in oklch, var(--background) 35%, transparent) 40%,
+    color-mix(in oklch, var(--background) 10%, transparent) 70%,
+    transparent 100%
+  );
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
+}
+
+.paper-scroll-container::after {
+  bottom: 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklch, var(--background) 70%, transparent) 0%,
+    color-mix(in oklch, var(--background) 35%, transparent) 40%,
+    color-mix(in oklch, var(--background) 10%, transparent) 70%,
+    transparent 100%
+  );
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  mask-image: linear-gradient(to top, black 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, black 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
+}
+
+/* When notes panel is open, adjust the blur to not cover the notes */
+.paper-scroll-container.with-notes::before,
+.paper-scroll-container.with-notes::after {
+  right: var(--notes-panel-width, 40%);
 }

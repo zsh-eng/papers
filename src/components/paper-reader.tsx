@@ -1,11 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { ArrowLeft, PanelRightOpen, PanelRightClose } from "lucide-react";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable";
 import { MarkdownViewer } from "@/components/markdown-viewer";
 import { NotesEditor } from "@/components/notes-editor";
 import type { Paper } from "@/lib/papers";
@@ -130,12 +125,13 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const isLoading = isLoadingContent || isLoadingNotes;
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      {/* Minimal navigation - back arrow */}
+    <div className="min-h-screen bg-background">
+      {/* Minimal navigation - back arrow, positioned below titlebar and after traffic lights */}
       <button
         onClick={onBack}
-        className="fixed top-6 left-6 z-10 p-2 text-muted-foreground/40 hover:text-foreground transition-colors"
+        className="fixed top-[calc(var(--titlebar-height)+0.5rem)] left-[var(--traffic-light-padding)] z-20 p-2 text-muted-foreground/40 hover:text-foreground transition-colors"
         aria-label="Go back"
+        data-no-drag
       >
         <ArrowLeft className="w-6 h-6" />
       </button>
@@ -143,8 +139,9 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       {/* Notes panel toggle */}
       <button
         onClick={() => setNotesOpen(!notesOpen)}
-        className="fixed top-6 right-6 z-10 p-2 text-muted-foreground/40 hover:text-foreground transition-colors"
+        className="fixed top-[calc(var(--titlebar-height)+0.5rem)] right-6 z-20 p-2 text-muted-foreground/40 hover:text-foreground transition-colors"
         aria-label={notesOpen ? "Close notes" : "Open notes"}
+        data-no-drag
       >
         {notesOpen ? (
           <PanelRightClose className="w-5 h-5" />
@@ -155,14 +152,14 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
 
       {/* Save status indicator - subtle */}
       {(isSaving || lastSaved) && (
-        <div className="fixed top-6 right-16 z-10 text-xs text-muted-foreground/50">
+        <div className="fixed top-[calc(var(--titlebar-height)+0.5rem)] right-16 z-20 text-xs text-muted-foreground/50 py-2">
           {isSaving ? "Saving..." : lastSaved ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : null}
         </div>
       )}
 
       {/* Error banner */}
       {error && (
-        <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm">
+        <div className="fixed top-0 left-0 right-0 z-30 px-4 py-2 bg-destructive/10 text-destructive text-sm">
           {error}
           <button
             onClick={() => setError(null)}
@@ -175,42 +172,31 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
 
       {/* Main content */}
       {isLoading ? (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="h-screen flex items-center justify-center">
           <div className="text-muted-foreground animate-pulse">Loading paper...</div>
         </div>
-      ) : notesOpen ? (
-        <ResizablePanelGroup orientation="horizontal" className="flex-1">
-          {/* Left panel - Markdown content */}
-          <ResizablePanel defaultSize={60} minSize={30} id="content-panel">
-            <div className="h-full overflow-auto">
-              <MarkdownViewer content={content} className="py-16 px-6" />
-            </div>
-          </ResizablePanel>
+      ) : (
+        <>
+          {/* Main scrollable paper content */}
+          <div 
+            className={`paper-scroll-container ${notesOpen ? 'with-notes' : ''}`}
+            style={notesOpen ? { marginRight: '40%' } : undefined}
+          >
+            <MarkdownViewer content={content} className="pb-32 px-6" />
+          </div>
 
-          <ResizableHandle withHandle />
-
-          {/* Right panel - Notes editor */}
-          <ResizablePanel defaultSize={40} minSize={20} id="notes-panel">
-            <div className="h-full flex flex-col">
-              <div className="px-4 py-3 bg-muted/30 shrink-0">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Notes
-                </span>
-              </div>
+          {/* Fixed notes sidebar - starts below titlebar */}
+          {notesOpen && (
+            <div className="fixed top-0 right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col pt-[var(--titlebar-height)]">
               <NotesEditor
                 value={notes}
                 onChange={handleNotesChange}
-                className="flex-1"
+                className="flex-1 overflow-hidden"
                 placeholder="Start writing your notes..."
               />
             </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        /* Full-width content view when notes are closed */
-        <div className="flex-1 overflow-auto">
-          <MarkdownViewer content={content} className="py-16 px-6" />
-        </div>
+          )}
+        </>
       )}
     </div>
   );

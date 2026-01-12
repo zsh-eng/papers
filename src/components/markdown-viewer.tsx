@@ -64,19 +64,21 @@ export function MarkdownViewer({ content, className }: MarkdownViewerProps) {
   }
 
   return (
-    <div className={cn("overflow-auto", className)}>
+    <div className={cn(className)}>
       <div className="max-w-[700px] mx-auto">
-        {/* Paper title */}
-        {frontmatter.title && (
-          <h1 className="paper-title">{frontmatter.title}</h1>
-        )}
-        
-        {/* Paper authors */}
-        {frontmatter.authors && frontmatter.authors.length > 0 && (
-          <div className="paper-authors">
-            {frontmatter.authors.join(" · ")}
-          </div>
-        )}
+        {/* Paper title hero section - positioned ~1/3 down */}
+        <div className="pt-[33vh] pb-16">
+          {frontmatter.title && (
+            <h1 className="paper-title">{frontmatter.title}</h1>
+          )}
+          
+          {/* Paper authors */}
+          {frontmatter.authors && frontmatter.authors.length > 0 && (
+            <div className="paper-authors">
+              {frontmatter.authors.join(" · ")}
+            </div>
+          )}
+        </div>
         
         {/* Paper body */}
         <div

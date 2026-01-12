@@ -22,25 +22,39 @@ export function App() {
   }
 
   if (!workspacePath) {
-    return <Onboarding onComplete={setWorkspace} />;
+    return (
+      <>
+        {/* Titlebar drag region for window dragging */}
+        <div className="titlebar-drag-region" />
+        <Onboarding onComplete={setWorkspace} />
+      </>
+    );
   }
 
   // Show paper reader if a paper is selected
   if (selectedPaper) {
     return (
-      <PaperReader
-        paper={selectedPaper}
-        onBack={() => setSelectedPaper(null)}
-      />
+      <>
+        {/* Titlebar drag region for window dragging */}
+        <div className="titlebar-drag-region" />
+        <PaperReader
+          paper={selectedPaper}
+          onBack={() => setSelectedPaper(null)}
+        />
+      </>
     );
   }
 
   return (
-    <PaperLibrary
-      workspacePath={workspacePath}
-      onChangeWorkspace={clearWorkspace}
-      onSelectPaper={setSelectedPaper}
-    />
+    <>
+      {/* Titlebar drag region for window dragging */}
+      <div className="titlebar-drag-region" />
+      <PaperLibrary
+        workspacePath={workspacePath}
+        onChangeWorkspace={clearWorkspace}
+        onSelectPaper={setSelectedPaper}
+      />
+    </>
   );
 }
 

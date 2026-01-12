@@ -75,8 +75,8 @@ export function PaperLibrary({
 
   return (
     <div className="h-screen flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b">
+      {/* Header - with titlebar inset for traffic lights */}
+      <header className="flex items-center justify-between px-4 py-3 border-b pt-[calc(var(--titlebar-height)+0.75rem)] pl-[var(--traffic-light-padding)]">
         <div className="flex items-center gap-2">
           <FileText className="w-5 h-5 text-primary" />
           <span className="font-semibold">Papers</span>

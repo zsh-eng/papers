@@ -34,7 +34,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   return (
-    <div className="h-screen flex items-center justify-center bg-background p-8">
+    <div className="h-screen flex items-center justify-center bg-background p-8 pt-[var(--titlebar-height)]">
       <div className="max-w-md w-full space-y-8 text-center">
         {/* Icon */}
         <div className="flex justify-center">

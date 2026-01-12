@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { EditorState } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
+import { EditorView, keymap, highlightActiveLine } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
@@ -13,33 +13,27 @@ interface NotesEditorProps {
   placeholder?: string;
 }
 
-// Create a custom theme that matches the app's styling
+// Create a custom theme that matches the app's styling (Obsidian-like)
 const customTheme = EditorView.theme({
   "&": {
     height: "100%",
-    fontSize: "14px",
+    fontSize: "16px",
   },
   ".cm-scroller": {
     fontFamily: "'Outfit', system-ui, sans-serif",
-    lineHeight: "1.6",
+    lineHeight: "1.75",
+    overflow: "auto",
   },
   ".cm-content": {
-    padding: "16px",
+    padding: "24px",
     caretColor: "var(--foreground)",
+    maxWidth: "100%",
   },
   ".cm-line": {
-    padding: "0 4px",
-  },
-  ".cm-gutters": {
-    backgroundColor: "transparent",
-    borderRight: "1px solid var(--border)",
-    color: "var(--muted-foreground)",
-  },
-  ".cm-activeLineGutter": {
-    backgroundColor: "var(--accent)",
+    padding: "2px 0",
   },
   ".cm-activeLine": {
-    backgroundColor: "var(--accent)",
+    backgroundColor: "transparent",
   },
   "&.cm-focused": {
     outline: "none",
@@ -81,9 +75,7 @@ export function NotesEditor({ value, onChange, className, placeholder }: NotesEd
     const state = EditorState.create({
       doc: value,
       extensions: [
-        lineNumbers(),
         highlightActiveLine(),
-        highlightActiveLineGutter(),
         history(),
         bracketMatching(),
         markdown(),
