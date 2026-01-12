@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { TabBar } from "@/components/tab-bar";
 import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useTabState } from "@/hooks/use-tab-state";
@@ -8,31 +9,10 @@ import { useTabState } from "@/hooks/use-tab-state";
  * Tab content is rendered in separate child webviews.
  */
 export function App() {
-  const {
-    tabs,
-    activeTabId,
-    isLoading,
-    createTab,
-    closeTab,
-    switchTab,
-    nextTab,
-    prevTab,
-    switchTabByIndex,
-  } = useTabState();
+  const { tabs, activeTabId, isLoading } = useTabState();
 
-  // Set up global keyboard shortcuts for tabs
-  useTabKeyboardShortcuts({
-    onNewTab: () => createTab("home"),
-    onCloseTab: () => {
-      // Close the active tab
-      if (activeTabId) {
-        closeTab(activeTabId);
-      }
-    },
-    onNextTab: nextTab,
-    onPrevTab: prevTab,
-    onSwitchToTab: (index) => switchTabByIndex(index - 1), // Convert 1-based to 0-based
-  });
+  // Set up global keyboard shortcuts for tabs (calls Rust directly)
+  useTabKeyboardShortcuts();
 
   if (isLoading) {
     return (
@@ -51,9 +31,15 @@ export function App() {
         <TabBar
           tabs={tabs}
           activeTabId={activeTabId}
-          onSwitchTab={switchTab}
-          onCloseTab={closeTab}
-          onNewTab={() => createTab("home")}
+          onSwitchTab={(id) => invoke("switch_tab", { id })}
+          onCloseTab={(id) => invoke("close_tab", { id })}
+          onNewTab={() =>
+            invoke("create_tab", {
+              tabType: "home",
+              paperPath: null,
+              title: "Library",
+            })
+          }
         />
       ) : (
         /* Titlebar drag region when no tabs shown */

@@ -3,8 +3,8 @@ use tauri_plugin_fs::FsExt;
 
 mod tabs;
 use tabs::{
-    close_tab, create_tab, get_tab_state, next_tab, prev_tab, switch_tab, switch_tab_by_index,
-    update_tab_title, TabManager, TAB_BAR_HEIGHT,
+    close_active_tab, close_tab, create_tab, get_tab_state, next_tab, prev_tab, switch_tab,
+    switch_tab_by_index, update_tab_title, TabManager, TAB_BAR_HEIGHT,
 };
 
 #[tauri::command]
@@ -68,6 +68,7 @@ pub fn run() {
             allow_directory,
             create_tab,
             close_tab,
+            close_active_tab,
             switch_tab,
             next_tab,
             prev_tab,

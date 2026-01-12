@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -16,7 +16,8 @@ export interface TabState {
 
 /**
  * Hook for syncing tab state from Rust backend.
- * Listens to tab-state-changed events and provides command wrappers.
+ * Read-only - listens to tab-state-changed events.
+ * All tab actions should be invoked directly via Rust commands.
  */
 export function useTabState() {
   const [state, setState] = useState<TabState>({ tabs: [], active_tab_id: "" });
@@ -46,53 +47,9 @@ export function useTabState() {
     };
   }, []);
 
-  // Command wrappers
-  const createTab = useCallback(
-    async (tabType: string, paperPath?: string, title?: string) => {
-      const tabTitle = title || (tabType === "home" ? "Library" : "Paper");
-      return invoke<string>("create_tab", {
-        tabType,
-        paperPath: paperPath || null,
-        title: tabTitle,
-      });
-    },
-    [],
-  );
-
-  const closeTab = useCallback(async (id: string) => {
-    return invoke("close_tab", { id });
-  }, []);
-
-  const switchTab = useCallback(async (id: string) => {
-    return invoke("switch_tab", { id });
-  }, []);
-
-  const nextTab = useCallback(async () => {
-    return invoke("next_tab");
-  }, []);
-
-  const prevTab = useCallback(async () => {
-    return invoke("prev_tab");
-  }, []);
-
-  const switchTabByIndex = useCallback(async (index: number) => {
-    return invoke("switch_tab_by_index", { index });
-  }, []);
-
-  const updateTabTitle = useCallback(async (id: string, title: string) => {
-    return invoke("update_tab_title", { id, title });
-  }, []);
-
   return {
     tabs: state.tabs,
     activeTabId: state.active_tab_id,
     isLoading,
-    createTab,
-    closeTab,
-    switchTab,
-    nextTab,
-    prevTab,
-    switchTabByIndex,
-    updateTabTitle,
   };
 }

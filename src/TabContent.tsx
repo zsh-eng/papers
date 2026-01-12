@@ -1,64 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { PaperLibrary } from "@/components/paper-library";
 import { PaperReader } from "@/components/paper-reader";
 import { Onboarding } from "@/components/onboarding";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { Paper } from "@/lib/papers";
 import { loadPaper } from "@/lib/papers";
-
-/**
- * Hook to register tab keyboard shortcuts in child webviews.
- * These call Rust commands directly since child webviews don't have tab state.
- */
-function useTabShortcuts() {
-  useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      const isMod = e.metaKey || e.ctrlKey;
-
-      // Cmd/Ctrl + T: New tab
-      if (isMod && e.key === "t") {
-        e.preventDefault();
-        await invoke("create_tab", { tabType: "home", paperPath: null, title: "Library" });
-        return;
-      }
-
-      // Cmd/Ctrl + W: Close current tab
-      if (isMod && e.key === "w") {
-        e.preventDefault();
-        // Get current webview's label (which is the tab ID)
-        const webview = getCurrentWebviewWindow();
-        await invoke("close_tab", { id: webview.label });
-        return;
-      }
-
-      // Cmd/Ctrl + Tab / Cmd/Ctrl + Shift + Tab: Cycle tabs
-      if (isMod && e.key === "Tab") {
-        e.preventDefault();
-        if (e.shiftKey) {
-          await invoke("prev_tab");
-        } else {
-          await invoke("next_tab");
-        }
-        return;
-      }
-
-      // Cmd + 1-9: Switch to specific tab
-      if (e.metaKey && !e.ctrlKey && !e.altKey) {
-        const num = parseInt(e.key, 10);
-        if (num >= 1 && num <= 9) {
-          e.preventDefault();
-          await invoke("switch_tab_by_index", { index: num - 1 });
-          return;
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-}
 
 /**
  * TabContent is rendered inside each child webview.
@@ -72,8 +20,8 @@ export function TabContent() {
   const { workspacePath, isLoading: isWorkspaceLoading, setWorkspace, clearWorkspace } =
     useWorkspace();
 
-  // Register tab keyboard shortcuts
-  useTabShortcuts();
+  // Register tab keyboard shortcuts (shared hook, calls Rust directly)
+  useTabKeyboardShortcuts();
 
   // SPA state for in-tab navigation
   const [view, setView] = useState<"home" | "paper">(initialTabType as "home" | "paper");

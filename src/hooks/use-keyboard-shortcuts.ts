@@ -1,15 +1,9 @@
-import { useEffect, useCallback } from "react";
-
-interface KeyboardShortcutsOptions {
-  onNewTab: () => unknown;
-  onCloseTab: () => unknown;
-  onNextTab: () => unknown;
-  onPrevTab: () => unknown;
-  onSwitchToTab: (index: number) => unknown;
-}
+import { useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * Hook for handling global keyboard shortcuts for tab management.
+ * Calls Rust commands directly - can be used in any webview.
  *
  * Shortcuts:
  * - Cmd/Ctrl + T: New tab
@@ -18,39 +12,33 @@ interface KeyboardShortcutsOptions {
  * - Cmd/Ctrl + Shift + Tab: Previous tab
  * - Cmd + 1-9: Switch to tab by index
  */
-export function useTabKeyboardShortcuts({
-  onNewTab,
-  onCloseTab,
-  onNextTab,
-  onPrevTab,
-  onSwitchToTab,
-}: KeyboardShortcutsOptions) {
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
+export function useTabKeyboardShortcuts() {
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
 
       // Cmd/Ctrl + T: New tab
       if (isMod && e.key === "t") {
         e.preventDefault();
-        onNewTab();
+        await invoke("create_tab", {
+          tabType: "home",
+          paperPath: null,
+          title: "Library",
+        });
         return;
       }
 
-      // Cmd/Ctrl + W: Close tab
+      // Cmd/Ctrl + W: Close active tab
       if (isMod && e.key === "w") {
         e.preventDefault();
-        onCloseTab();
+        await invoke("close_active_tab");
         return;
       }
 
       // Cmd/Ctrl + Tab / Cmd/Ctrl + Shift + Tab: Cycle tabs
       if (isMod && e.key === "Tab") {
         e.preventDefault();
-        if (e.shiftKey) {
-          onPrevTab();
-        } else {
-          onNextTab();
-        }
+        await invoke(e.shiftKey ? "prev_tab" : "next_tab");
         return;
       }
 
@@ -59,16 +47,13 @@ export function useTabKeyboardShortcuts({
         const num = parseInt(e.key, 10);
         if (num >= 1 && num <= 9) {
           e.preventDefault();
-          onSwitchToTab(num);
+          await invoke("switch_tab_by_index", { index: num - 1 });
           return;
         }
       }
-    },
-    [onNewTab, onCloseTab, onNextTab, onPrevTab, onSwitchToTab],
-  );
+    };
 
-  useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+  }, []);
 }

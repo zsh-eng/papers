@@ -365,3 +365,15 @@ pub fn update_tab_title(app: AppHandle, id: String, title: String) -> Result<(),
     emit_tab_state(&app);
     Ok(())
 }
+
+#[tauri::command]
+pub fn close_active_tab(app: AppHandle) -> Result<(), String> {
+    let manager = app.state::<TabManager>();
+    let state = manager.get_state();
+
+    if state.active_tab_id.is_empty() {
+        return Ok(());
+    }
+
+    close_tab(app, state.active_tab_id)
+}
