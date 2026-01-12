@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::webview::WebviewBuilder;
-use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl};
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl};
 use uuid::Uuid;
 
 pub const TAB_BAR_HEIGHT: f64 = 38.0;
@@ -354,11 +354,16 @@ pub fn get_tab_state(app: AppHandle) -> TabState {
 }
 
 #[tauri::command]
-pub fn update_tab_title(app: AppHandle, id: String, title: String) -> Result<(), String> {
+pub fn update_current_tab_title(
+    webview: Webview,
+    app: AppHandle,
+    title: String,
+) -> Result<(), String> {
+    let tab_id = webview.label();
     let manager = app.state::<TabManager>();
     {
         let mut state = manager.state.lock().unwrap();
-        if let Some(tab) = state.tabs.iter_mut().find(|t| t.id == id) {
+        if let Some(tab) = state.tabs.iter_mut().find(|t| t.id == tab_id) {
             tab.title = title;
         }
     }
@@ -376,4 +381,30 @@ pub fn close_active_tab(app: AppHandle) -> Result<(), String> {
     }
 
     close_tab(app, state.active_tab_id)
+}
+
+/// Helper function for menu event - creates a new home tab
+pub fn create_tab_internal_from_menu(app: &AppHandle) -> Result<(), String> {
+    create_tab_internal(app, "home", None, "Library".to_string())
+}
+
+/// Helper function for menu event - closes active tab or window if single tab
+pub fn close_tab_or_window(app: &AppHandle) -> Result<(), String> {
+    let manager = app.state::<TabManager>();
+    let state = manager.get_state();
+
+    // If only one tab, close the entire window
+    if state.tabs.len() <= 1 {
+        if let Some(window) = app.get_window("main") {
+            let _ = window.close();
+        }
+        return Ok(());
+    }
+
+    // Otherwise, close just the active tab
+    if !state.active_tab_id.is_empty() {
+        close_tab(app.clone(), state.active_tab_id)?;
+    }
+
+    Ok(())
 }

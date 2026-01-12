@@ -37,16 +37,21 @@ export function TabContent() {
           if (loadedPaper) {
             setCurrentPaper(loadedPaper);
             setView("paper");
+            // Update tab title with paper name
+            const title = loadedPaper.metadata.title || loadedPaper.filename;
+            invoke("update_current_tab_title", { title });
           } else {
             // Paper not found, fall back to home view
             console.error("Paper not found at path:", paperPath);
             setView("home");
+            invoke("update_current_tab_title", { title: "Library" });
           }
         })
         .catch((err: unknown) => {
           console.error("Failed to load paper:", err);
           // Fall back to home view
           setView("home");
+          invoke("update_current_tab_title", { title: "Library" });
         })
         .finally(() => {
           setIsPaperLoading(false);
@@ -69,15 +74,20 @@ export function TabContent() {
         // Navigate within this tab (SPA style)
         setCurrentPaper(selectedPaper);
         setView("paper");
+        // Update tab title with paper name
+        const title = selectedPaper.metadata.title || selectedPaper.filename;
+        await invoke("update_current_tab_title", { title });
       }
     },
     []
   );
 
   // Handle back navigation from paper reader (SPA navigation)
-  const handleBack = useCallback(() => {
+  const handleBack = useCallback(async () => {
     setView("home");
     setCurrentPaper(null);
+    // Update tab title back to Library
+    await invoke("update_current_tab_title", { title: "Library" });
   }, []);
 
   // Loading states

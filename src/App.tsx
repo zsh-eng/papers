@@ -22,30 +22,21 @@ export function App() {
     );
   }
 
-  // Show tab bar only when there are 2+ tabs
-  const showTabBar = tabs.length >= 2;
-
+  // Always show the tab bar
   return (
-    <>
-      {showTabBar ? (
-        <TabBar
-          tabs={tabs}
-          activeTabId={activeTabId}
-          onSwitchTab={(id) => invoke("switch_tab", { id })}
-          onCloseTab={(id) => invoke("close_tab", { id })}
-          onNewTab={() =>
-            invoke("create_tab", {
-              tabType: "home",
-              paperPath: null,
-              title: "Library",
-            })
-          }
-        />
-      ) : (
-        /* Titlebar drag region when no tabs shown */
-        <div className="titlebar-drag-region" />
-      )}
-    </>
+    <TabBar
+      tabs={tabs}
+      activeTabId={activeTabId}
+      onSwitchTab={(id) => invoke("switch_tab", { id })}
+      onCloseTab={(id) => invoke("close_tab", { id })}
+      onNewTab={() =>
+        invoke("create_tab", {
+          tabType: "home",
+          paperPath: null,
+          title: "Library",
+        })
+      }
+    />
   );
 }
 

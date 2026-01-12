@@ -1,10 +1,11 @@
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{LogicalSize, Manager};
 use tauri_plugin_fs::FsExt;
 
 mod tabs;
 use tabs::{
     close_active_tab, close_tab, create_tab, get_tab_state, next_tab, prev_tab, switch_tab,
-    switch_tab_by_index, update_tab_title, TabManager, TAB_BAR_HEIGHT,
+    switch_tab_by_index, update_current_tab_title, TabManager, TAB_BAR_HEIGHT,
 };
 
 #[tauri::command]
@@ -31,6 +32,73 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Build custom application menu
+            let handle = app.handle();
+
+            // Create menu items
+            let new_tab = MenuItemBuilder::with_id("new_tab", "New Tab")
+                .accelerator("CmdOrCtrl+T")
+                .build(handle)?;
+
+            let close_tab_item = MenuItemBuilder::with_id("close_tab", "Close Tab")
+                .accelerator("CmdOrCtrl+W")
+                .build(handle)?;
+
+            let next_tab_item = MenuItemBuilder::with_id("next_tab", "Next Tab")
+                .accelerator("Ctrl+Tab")
+                .build(handle)?;
+
+            let prev_tab_item = MenuItemBuilder::with_id("prev_tab", "Previous Tab")
+                .accelerator("Ctrl+Shift+Tab")
+                .build(handle)?;
+
+            // Build File submenu
+            let file_menu = SubmenuBuilder::new(handle, "File")
+                .item(&new_tab)
+                .item(&close_tab_item)
+                .separator()
+                .item(&next_tab_item)
+                .item(&prev_tab_item)
+                .build()?;
+
+            // Build the full menu with standard Edit menu for copy/paste
+            let edit_menu = SubmenuBuilder::new(handle, "Edit")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
+                .build()?;
+
+            let menu = MenuBuilder::new(handle)
+                .item(&file_menu)
+                .item(&edit_menu)
+                .build()?;
+
+            app.set_menu(menu)?;
+
+            // Handle menu events
+            let app_handle_for_menu = handle.clone();
+            app.on_menu_event(move |_app, event| {
+                match event.id().as_ref() {
+                    "new_tab" => {
+                        let _ = tabs::create_tab_internal_from_menu(&app_handle_for_menu);
+                    }
+                    "close_tab" => {
+                        let _ = tabs::close_tab_or_window(&app_handle_for_menu);
+                    }
+                    "next_tab" => {
+                        let _ = next_tab(app_handle_for_menu.clone());
+                    }
+                    "prev_tab" => {
+                        let _ = prev_tab(app_handle_for_menu.clone());
+                    }
+                    _ => {}
+                }
+            });
 
             // Create initial home tab
             let handle = app.handle().clone();
@@ -74,7 +142,7 @@ pub fn run() {
             prev_tab,
             switch_tab_by_index,
             get_tab_state,
-            update_tab_title,
+            update_current_tab_title,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -47,11 +47,11 @@ function TabItem({
         }
       }}
       className={cn(
-        "tab-item group relative flex items-center gap-1.5 px-3 py-1.5 rounded-md cursor-pointer transition-colors select-none",
-        "min-w-[120px] max-w-[200px]",
+        "tab-item group relative flex items-center gap-1.5 px-3 py-1.5 cursor-pointer transition-colors select-none",
+        "flex-1 min-w-0", // Equal distribution, allow shrinking
         isActive
-          ? "bg-muted text-foreground"
-          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          ? "bg-background text-foreground rounded-full"
+          : "text-muted-foreground hover:text-foreground",
       )}
       data-no-drag
     >
@@ -63,9 +63,9 @@ function TabItem({
           onClose();
         }}
         className={cn(
-          "tab-close-btn flex-shrink-0 p-0.5 rounded-sm transition-all",
+          "tab-close-btn shrink-0 p-0.5 rounded-full transition-all",
           "opacity-0 group-hover:opacity-100",
-          "hover:bg-foreground/10"
+          "hover:bg-foreground/10",
         )}
         aria-label="Close tab"
         data-no-drag
@@ -74,12 +74,15 @@ function TabItem({
       </button>
 
       {/* Tab title */}
-      <span className="flex-1 truncate text-xs font-medium">{tab.title}</span>
+      <span className="flex-1 truncate text-xs font-medium text-center text-ellipsis">
+        {tab.title}
+      </span>
 
-      {/* Keyboard shortcut badge */}
+      {/* Keyboard shortcut badge - larger text */}
       {shortcutKey && (
-        <span className="flex-shrink-0 text-[10px] text-muted-foreground/60 font-mono">
-          ⌘{shortcutKey}
+        <span className="flex-shrink-0 text-xs text-muted-foreground/60 font-mono">
+          <span className="text-sm">⌘</span>
+          {shortcutKey}
         </span>
       )}
     </div>
@@ -95,14 +98,14 @@ export function TabBar({
 }: TabBarProps) {
   return (
     <div
-      className="tab-bar fixed top-0 left-0 right-0 h-[var(--titlebar-height)] flex items-center z-50"
+      className="tab-bar fixed top-0 left-0 right-0 h-[var(--titlebar-height)] flex items-center z-50 bg-muted"
       role="tablist"
     >
       {/* Traffic light safe area spacer */}
       <div className="flex-shrink-0 w-[var(--traffic-light-padding)]" />
 
-      {/* Tabs container */}
-      <div className="relative flex items-center gap-1 flex-1 overflow-x-auto no-scrollbar pr-2">
+      {/* Tabs container - no gap, fills available space */}
+      <div className="relative flex items-center flex-1 overflow-x-auto no-scrollbar px-1">
         {tabs.map((tab, index) => (
           <TabItem
             key={tab.id}
@@ -116,7 +119,7 @@ export function TabBar({
       </div>
 
       {/* New tab button */}
-      <div className="relative flex-shrink-0 pr-3">
+      <div className="relative flex-shrink-0 px-2">
         <Button
           variant="ghost"
           size="icon-xs"
