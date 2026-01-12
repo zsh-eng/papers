@@ -184,8 +184,17 @@
   font-size: 120%;
   line-height: 1.8;
   text-align: justify;
-  max-width: 700px;
-  margin: 0 auto;
+  /* Use CSS Grid to allow full-bleed content */
+  display: grid;
+  grid-template-columns:
+    1fr
+    min(700px, 100%)
+    1fr;
+}
+
+/* All direct children stay in the center column by default */
+.markdown-content > * {
+  grid-column: 2;
 }
 
 /* Paper title styling */
@@ -310,10 +319,19 @@
   padding: 0;
 }
 
+/* Tables can extend beyond text column */
 .markdown-content table {
-  width: 100%;
+  /* Span all columns to allow table to extend in both directions */
+  grid-column: 1 / -1;
+  width: fit-content;
+  max-width: 100%;
   border-collapse: collapse;
   margin-bottom: 1rem;
+  /* Center the table */
+  margin-left: auto;
+  margin-right: auto;
+  /* Ensure table doesn't get wider than viewport */
+  overflow-x: auto;
 }
 
 .markdown-content th,
@@ -339,16 +357,26 @@
   margin: 2.5rem 0;
 }
 
+/* Images can extend beyond text column */
 .markdown-content img {
+  /* Span all columns to allow image to extend in both directions */
+  grid-column: 1 / -1;
   max-width: 100%;
+  width: fit-content;
   height: auto;
   border-radius: var(--radius);
-  margin: 1rem 0;
+  margin: 1rem auto;
+  /* Center the image */
+  display: block;
 }
 
 /* KaTeX styling overrides */
 .markdown-content .katex-display {
-  margin: 1.5rem 0;
+  /* Allow math displays to extend beyond text column if needed */
+  grid-column: 1 / -1;
+  width: fit-content;
+  max-width: 100%;
+  margin: 1.5rem auto;
   overflow-x: auto;
   overflow-y: hidden;
 }
