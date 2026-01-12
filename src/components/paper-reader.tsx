@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { ArrowLeft, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { MarkdownViewer } from "@/components/markdown-viewer";
 import { NotesEditor } from "@/components/notes-editor";
 import type { Paper } from "@/lib/papers";
@@ -128,37 +127,41 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     };
   }, [paper.path, notes]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Esc to go back - only if nothing is focused (no active element with input/textarea/contenteditable)
+      if (e.key === "Escape") {
+        const activeElement = document.activeElement;
+        const isInputFocused =
+          activeElement instanceof HTMLInputElement ||
+          activeElement instanceof HTMLTextAreaElement ||
+          activeElement?.hasAttribute("contenteditable");
+        
+        // Don't handle Esc if an input element is focused or if any modal/dialog might be open
+        if (!isInputFocused && activeElement === document.body) {
+          onBack();
+        }
+      }
+
+      // Cmd/Ctrl + B to toggle sidebar
+      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+        e.preventDefault();
+        setNotesOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onBack]);
+
   const isLoading = isLoadingContent || isLoadingNotes;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Minimal navigation - back arrow, positioned below titlebar and after traffic lights */}
-      <button
-        onClick={onBack}
-        className="fixed top-[calc(var(--titlebar-height)+0.5rem)] left-[var(--traffic-light-padding)] z-20 p-2 text-muted-foreground/40 hover:text-foreground transition-colors"
-        aria-label="Go back"
-        data-no-drag
-      >
-        <ArrowLeft className="w-6 h-6" />
-      </button>
-
-      {/* Notes panel toggle */}
-      <button
-        onClick={() => setNotesOpen(!notesOpen)}
-        className="fixed top-[calc(var(--titlebar-height)+0.5rem)] right-6 z-20 p-2 text-muted-foreground/40 hover:text-foreground transition-colors"
-        aria-label={notesOpen ? "Close notes" : "Open notes"}
-        data-no-drag
-      >
-        {notesOpen ? (
-          <PanelRightClose className="w-5 h-5" />
-        ) : (
-          <PanelRightOpen className="w-5 h-5" />
-        )}
-      </button>
-
       {/* Save status indicator - subtle */}
       {(isSaving || lastSaved) && (
-        <div className="fixed top-[calc(var(--titlebar-height)+0.5rem)] right-16 z-20 text-xs text-muted-foreground/50 py-2">
+        <div className="fixed top-[calc(var(--titlebar-height)+0.5rem)] right-6 z-20 text-xs text-muted-foreground/50 py-2">
           {isSaving
             ? "Saving..."
             : lastSaved
