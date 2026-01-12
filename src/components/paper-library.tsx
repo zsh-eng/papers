@@ -1,4 +1,5 @@
 import { usePapers } from "@/hooks/use-papers";
+import { useDarkMode } from "@/hooks/use-dark-mode";
 import type { Paper } from "@/lib/papers";
 import { cn } from "@/lib/utils";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -89,6 +90,7 @@ export function PaperLibrary({
     usePapers(workspacePath);
   const [isDragOver, setIsDragOver] = useState(false);
   const [hoveredPaperId, setHoveredPaperId] = useState<string | null>(null);
+  const { isDark, toggle } = useDarkMode();
 
   // Sort papers by year (newest first), then alphabetically by title
   const sortedPapers = useMemo(() => {
@@ -158,6 +160,14 @@ export function PaperLibrary({
             <span>
               {paperCount} {paperCount === 1 ? "PAPER" : "PAPERS"}
             </span>
+            <button
+              onClick={toggle}
+              className="ml-auto text-sm hover:text-muted-foreground transition-colors"
+              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+              data-no-drag
+            >
+              {isDark ? "☀" : "☾"}
+            </button>
           </div>
 
           {/* Error message */}
