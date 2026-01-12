@@ -474,3 +474,36 @@
 .paper-scroll-container.with-notes::after {
     right: var(--notes-panel-width, 40%);
 }
+
+/* Tab bar styles */
+.tab-bar {
+    -webkit-app-region: drag;
+}
+
+.tab-bar [data-no-drag] {
+    -webkit-app-region: no-drag;
+}
+
+/* Hide scrollbar in tabs container */
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Tab item hover effect for close button */
+.tab-item .tab-close-btn {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Smooth transition for close button visibility */
+.tab-item .tab-close-btn {
+    transition: opacity 150ms ease;
+}

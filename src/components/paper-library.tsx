@@ -7,10 +7,16 @@ import { useEffect, useMemo, useState } from "react";
 interface PaperLibraryProps {
   workspacePath: string;
   onChangeWorkspace: () => void;
-  onSelectPaper: (paper: Paper) => void;
+  onSelectPaper: (paper: Paper, openInNewTab: boolean) => void;
 }
 
-function PaperItem({ paper, onClick }: { paper: Paper; onClick: () => void }) {
+function PaperItem({
+  paper,
+  onClick,
+}: {
+  paper: Paper;
+  onClick: (openInNewTab: boolean) => void;
+}) {
   const { metadata } = paper;
   const displayTitle = metadata.title || paper.filename;
   const displayAuthors =
@@ -20,16 +26,21 @@ function PaperItem({ paper, onClick }: { paper: Paper; onClick: () => void }) {
         : metadata.authors.join(", ")
       : null;
 
+  const handleClick = (e: React.MouseEvent | React.KeyboardEvent) => {
+    const openInNewTab = e.metaKey || e.ctrlKey;
+    onClick(openInNewTab);
+  };
+
   return (
     <div
       className="py-4 cursor-pointer group"
-      onClick={onClick}
+      onClick={handleClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onClick();
+          handleClick(e);
         }
       }}
     >
@@ -137,7 +148,7 @@ export function PaperLibrary({
               <PaperItem
                 key={paper.id}
                 paper={paper}
-                onClick={() => onSelectPaper(paper)}
+                onClick={(openInNewTab) => onSelectPaper(paper, openInNewTab)}
               />
             ))
           )}
