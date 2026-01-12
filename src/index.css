@@ -141,7 +141,7 @@
 
 /* Custom titlebar for Tauri - macOS overlay style */
 :root {
-    --titlebar-height: 38px;
+    --titlebar-height: 34px;
     --traffic-light-padding: 78px; /* Space for macOS traffic lights */
 }
 
@@ -490,15 +490,6 @@
 
 .no-scrollbar::-webkit-scrollbar {
     display: none;
-}
-
-/* Tab item hover effect for close button */
-.tab-item .tab-close-btn {
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 /* Smooth transition for close button visibility */

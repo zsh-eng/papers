@@ -1,7 +1,7 @@
-import { X, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { TabInfo } from "@/hooks/use-tab-state";
 import { Button } from "@/components/ui/button";
+import type { TabInfo } from "@/hooks/use-tab-state";
+import { cn } from "@/lib/utils";
+import { Plus, X } from "lucide-react";
 
 interface TabBarProps {
   tabs: TabInfo[];
@@ -47,11 +47,11 @@ function TabItem({
         }
       }}
       className={cn(
-        "tab-item group relative flex items-center gap-1.5 px-3 py-1.5 cursor-pointer transition-colors select-none",
+        "tab-item group relative flex items-center gap-1.5 px-2 py-0.75 transition-colors select-none rounded-full",
         "flex-1 min-w-0", // Equal distribution, allow shrinking
         isActive
-          ? "bg-background text-foreground rounded-full"
-          : "text-muted-foreground hover:text-foreground",
+          ? "bg-background text-foreground"
+          : "text-muted-foreground hover:bg-background/60",
       )}
       data-no-drag
     >
@@ -63,14 +63,14 @@ function TabItem({
           onClose();
         }}
         className={cn(
-          "tab-close-btn shrink-0 p-0.5 rounded-full transition-all",
+          "shrink-0 p-1 rounded-full transition-all flex items-center justify-center text-muted-foreground",
           "opacity-0 group-hover:opacity-100",
-          "hover:bg-foreground/10",
+          "hover:bg-foreground/10 hover:text-foreground/70",
         )}
         aria-label="Close tab"
         data-no-drag
       >
-        <X className="w-3 h-3" />
+        <X className="size-3" />
       </button>
 
       {/* Tab title */}
@@ -80,9 +80,9 @@ function TabItem({
 
       {/* Keyboard shortcut badge - larger text */}
       {shortcutKey && (
-        <span className="flex-shrink-0 text-xs text-muted-foreground/60 font-mono">
-          <span className="text-sm">⌘</span>
-          {shortcutKey}
+        <span className="shrink-0 text-xs text-muted-foreground/60 mr-1">
+          <span className="text-xs mr-px">⌘</span>
+          <span>{shortcutKey}</span>
         </span>
       )}
     </div>
@@ -105,7 +105,7 @@ export function TabBar({
       <div className="flex-shrink-0 w-[var(--traffic-light-padding)]" />
 
       {/* Tabs container - no gap, fills available space */}
-      <div className="relative flex items-center flex-1 overflow-x-auto no-scrollbar px-1">
+      <div className="relative flex items-center flex-1 overflow-x-auto no-scrollbar px-1 gap-0.5">
         {tabs.map((tab, index) => (
           <TabItem
             key={tab.id}
