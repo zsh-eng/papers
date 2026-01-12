@@ -1,10 +1,10 @@
 import { X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Tab } from "@/hooks/use-tabs";
+import type { TabInfo } from "@/hooks/use-tab-state";
 import { Button } from "@/components/ui/button";
 
 interface TabBarProps {
-  tabs: Tab[];
+  tabs: TabInfo[];
   activeTabId: string;
   onSwitchTab: (id: string) => void;
   onCloseTab: (id: string) => void;
@@ -18,7 +18,7 @@ function TabItem({
   onSwitch,
   onClose,
 }: {
-  tab: Tab;
+  tab: TabInfo;
   index: number;
   isActive: boolean;
   onSwitch: () => void;

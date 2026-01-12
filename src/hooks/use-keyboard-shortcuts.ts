@@ -1,16 +1,16 @@
 import { useEffect, useCallback } from "react";
 
 interface KeyboardShortcutsOptions {
-  onNewTab: () => void;
-  onCloseTab: () => void;
-  onNextTab: () => void;
-  onPrevTab: () => void;
-  onSwitchToTab: (index: number) => void;
+  onNewTab: () => unknown;
+  onCloseTab: () => unknown;
+  onNextTab: () => unknown;
+  onPrevTab: () => unknown;
+  onSwitchToTab: (index: number) => unknown;
 }
 
 /**
  * Hook for handling global keyboard shortcuts for tab management.
- * 
+ *
  * Shortcuts:
  * - Cmd/Ctrl + T: New tab
  * - Cmd/Ctrl + W: Close current tab
@@ -64,7 +64,7 @@ export function useTabKeyboardShortcuts({
         }
       }
     },
-    [onNewTab, onCloseTab, onNextTab, onPrevTab, onSwitchToTab]
+    [onNewTab, onCloseTab, onNextTab, onPrevTab, onSwitchToTab],
   );
 
   useEffect(() => {

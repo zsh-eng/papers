@@ -1,120 +1,44 @@
-import { Onboarding } from "@/components/onboarding";
-import { PaperLibrary } from "@/components/paper-library";
-import { PaperReader } from "@/components/paper-reader";
 import { TabBar } from "@/components/tab-bar";
 import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
-import type { Tab } from "@/hooks/use-tabs";
-import { useTabs } from "@/hooks/use-tabs";
-import { useWorkspace } from "@/hooks/use-workspace";
-import type { Paper } from "@/lib/papers";
-import { cn } from "@/lib/utils";
-import { memo, useCallback, useEffect } from "react";
+import { useTabState } from "@/hooks/use-tab-state";
 
-function LoadingScreen() {
-  return (
-    <div className="h-screen flex items-center justify-center">
-      <div className="animate-pulse text-muted-foreground">Loading...</div>
-    </div>
-  );
-}
-
-// Memoized tab pane to prevent re-renders when other tabs change
-const TabPane = memo(function TabPane({
-  tab,
-  isActive,
-  workspacePath,
-  onBack,
-  onChangeWorkspace,
-  onSelectPaper,
-}: {
-  tab: Tab;
-  isActive: boolean;
-  workspacePath: string;
-  onBack: () => void;
-  onChangeWorkspace: () => void;
-  onSelectPaper: (paper: Paper, openInNewTab: boolean) => void;
-}) {
-  useEffect(() => {
-    console.log(`TabPane ${tab.id} mounted/updated, isActive: ${isActive}`);
-  });
-
-  return (
-    <div
-      className={cn(
-        "fixed inset-0 top-[var(--titlebar-height)] overflow-y-auto",
-        isActive
-          ? "z-10"
-          : "invisible z-0 pointer-events-none [content-visibility:hidden] [contain-intrinsic-size:auto_100vh]",
-      )}
-    >
-      {tab.type === "paper" && tab.paper ? (
-        <PaperReader paper={tab.paper} onBack={onBack} />
-      ) : (
-        <PaperLibrary
-          workspacePath={workspacePath}
-          onChangeWorkspace={onChangeWorkspace}
-          onSelectPaper={onSelectPaper}
-        />
-      )}
-    </div>
-  );
-});
-
+/**
+ * Shell App - renders only in the main webview.
+ * Displays the TabBar and manages tab state via Rust backend.
+ * Tab content is rendered in separate child webviews.
+ */
 export function App() {
-  const { workspacePath, isLoading, setWorkspace, clearWorkspace } =
-    useWorkspace();
   const {
     tabs,
     activeTabId,
+    isLoading,
     createTab,
     closeTab,
-    closeActiveTab,
-    switchToTab,
-    switchToTabIndex,
+    switchTab,
     nextTab,
     prevTab,
-    navigateToPaper,
-    navigateToHome,
-  } = useTabs();
+    switchTabByIndex,
+  } = useTabState();
 
   // Set up global keyboard shortcuts for tabs
   useTabKeyboardShortcuts({
     onNewTab: () => createTab("home"),
-    onCloseTab: closeActiveTab,
-    onNextTab: nextTab,
-    onPrevTab: prevTab,
-    onSwitchToTab: switchToTabIndex,
-  });
-
-  // Handle paper selection from library
-  // If metaKey (Cmd) is held, open in new tab; otherwise navigate current tab
-  const handleSelectPaper = useCallback(
-    (paper: Paper, openInNewTab: boolean) => {
-      if (openInNewTab) {
-        createTab("paper", paper);
-      } else {
-        navigateToPaper(paper);
+    onCloseTab: () => {
+      // Close the active tab
+      if (activeTabId) {
+        closeTab(activeTabId);
       }
     },
-    [createTab, navigateToPaper],
-  );
-
-  // Handle back navigation from paper reader
-  const handleBack = useCallback(() => {
-    navigateToHome();
-  }, [navigateToHome]);
+    onNextTab: nextTab,
+    onPrevTab: prevTab,
+    onSwitchToTab: (index) => switchTabByIndex(index - 1), // Convert 1-based to 0-based
+  });
 
   if (isLoading) {
-    return <LoadingScreen />;
-  }
-
-  if (!workspacePath) {
     return (
-      <>
-        {/* Titlebar drag region for window dragging */}
-        <div className="titlebar-drag-region" />
-        <Onboarding onComplete={setWorkspace} />
-      </>
+      <div className="h-screen flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
     );
   }
 
@@ -127,7 +51,7 @@ export function App() {
         <TabBar
           tabs={tabs}
           activeTabId={activeTabId}
-          onSwitchTab={switchToTab}
+          onSwitchTab={switchTab}
           onCloseTab={closeTab}
           onNewTab={() => createTab("home")}
         />
@@ -135,18 +59,6 @@ export function App() {
         /* Titlebar drag region when no tabs shown */
         <div className="titlebar-drag-region" />
       )}
-      {/* Render all tabs, hide inactive ones to preserve state including scroll position */}
-      {tabs.map((tab) => (
-        <TabPane
-          key={tab.id}
-          tab={tab}
-          isActive={tab.id === activeTabId}
-          workspacePath={workspacePath}
-          onBack={handleBack}
-          onChangeWorkspace={clearWorkspace}
-          onSelectPaper={handleSelectPaper}
-        />
-      ))}
     </>
   );
 }

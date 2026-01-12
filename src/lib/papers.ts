@@ -296,7 +296,62 @@ function parseFrontmatter(content: string): Partial<PaperMetadata> {
 }
 
 /**
- * Load a paper from its folder
+ * Load a paper from its folder path
+ */
+export async function loadPaper(paperPath: string): Promise<Paper | null> {
+  const pdfPath = `${paperPath}/index.pdf`;
+  const contentPath = `${paperPath}/content.md`;
+  const folderName = paperPath.split("/").pop() || paperPath;
+
+  // Check if this is a valid paper folder
+  if (!(await pathExists(pdfPath))) {
+    return null;
+  }
+
+  // Get PDF info
+  const fileInfo = await stat(pdfPath);
+
+  // Try to read and parse content.md for metadata
+  let metadata: PaperMetadata = {
+    title: folderName,
+    authors: [],
+    year: null,
+    doi: null,
+    abstract: null,
+    tags: [],
+  };
+
+  try {
+    const content = await readTextFile(contentPath);
+    const parsed = parseFrontmatter(content);
+    metadata = {
+      title: parsed.title || folderName,
+      authors: parsed.authors || [],
+      year: parsed.year || null,
+      doi: parsed.doi || null,
+      abstract: parsed.abstract || null,
+      tags: parsed.tags || [],
+    };
+  } catch {
+    // No content.md or parsing failed, use defaults
+  }
+
+  const filename = `${folderName}.pdf`;
+
+  return {
+    id: folderName,
+    filename,
+    path: paperPath,
+    pdfPath,
+    contentPath,
+    addedAt: fileInfo.mtime ? new Date(fileInfo.mtime) : new Date(),
+    size: fileInfo.size ? Number(fileInfo.size) : 0,
+    metadata,
+  };
+}
+
+/**
+ * Load a paper from its folder (internal helper)
  */
 async function loadPaperFromFolder(
   papersDir: string,
