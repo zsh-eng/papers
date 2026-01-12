@@ -5,6 +5,7 @@ import { Onboarding } from "@/components/onboarding";
 import { PaperLibrary } from "@/components/paper-library";
 import { PaperReader } from "@/components/paper-reader";
 import { TabBar } from "@/components/tab-bar";
+import { cn } from "@/lib/utils";
 import type { Paper } from "@/lib/papers";
 
 function LoadingScreen() {
@@ -19,7 +20,6 @@ export function App() {
   const { workspacePath, isLoading, setWorkspace, clearWorkspace } = useWorkspace();
   const {
     tabs,
-    activeTab,
     activeTabId,
     createTab,
     closeTab,
@@ -73,26 +73,6 @@ export function App() {
   // Show tab bar only when there are 2+ tabs
   const showTabBar = tabs.length >= 2;
 
-  // Render content based on active tab
-  const renderContent = () => {
-    if (activeTab.type === "paper" && activeTab.paper) {
-      return (
-        <PaperReader
-          paper={activeTab.paper}
-          onBack={handleBack}
-        />
-      );
-    }
-
-    return (
-      <PaperLibrary
-        workspacePath={workspacePath}
-        onChangeWorkspace={clearWorkspace}
-        onSelectPaper={handleSelectPaper}
-      />
-    );
-  };
-
   return (
     <>
       {showTabBar ? (
@@ -107,7 +87,34 @@ export function App() {
         /* Titlebar drag region when no tabs shown */
         <div className="titlebar-drag-region" />
       )}
-      {renderContent()}
+      {/* Render all tabs, hide inactive ones to preserve state including scroll position */}
+      {tabs.map((tab) => {
+        const isActive = tab.id === activeTabId;
+        return (
+          <div
+            key={tab.id}
+            className={cn(
+              "fixed inset-0 top-[var(--titlebar-height)] overflow-y-auto",
+              isActive
+                ? "visible z-10"
+                : "invisible z-0 pointer-events-none"
+            )}
+          >
+            {tab.type === "paper" && tab.paper ? (
+              <PaperReader
+                paper={tab.paper}
+                onBack={handleBack}
+              />
+            ) : (
+              <PaperLibrary
+                workspacePath={workspacePath}
+                onChangeWorkspace={clearWorkspace}
+                onSelectPaper={handleSelectPaper}
+              />
+            )}
+          </div>
+        );
+      })}
     </>
   );
 }
