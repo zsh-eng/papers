@@ -550,14 +550,13 @@ class ObsidianModePlugin {
       },
     });
 
-    // Sort decorations by position (required for RangeSetBuilder)
+    // Sort decorations by position and startSide (required for RangeSetBuilder)
     decorations.sort((a, b) => {
       if (a.from !== b.from) return a.from - b.from;
-      // For same position, widget decorations should come after mark decorations
-      const aIsWidget = a.decoration.spec?.widget;
-      const bIsWidget = b.decoration.spec?.widget;
-      if (aIsWidget && !bIsWidget) return 1;
-      if (!aIsWidget && bIsWidget) return -1;
+      // For same position, sort by startSide (lower startSide comes first)
+      const aStartSide = a.decoration.startSide ?? 0;
+      const bStartSide = b.decoration.startSide ?? 0;
+      if (aStartSide !== bStartSide) return aStartSide - bStartSide;
       return a.to - b.to;
     });
 
