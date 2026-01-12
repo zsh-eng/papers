@@ -70,43 +70,49 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   }, [paper.path, paper.metadata.title]);
 
   // Save notes to file
-  const saveNotes = useCallback(async (notesContent: string) => {
-    if (!notesModifiedRef.current) return;
-    
-    setIsSaving(true);
-    try {
-      const notesPath = `${paper.path}/notes.md`;
-      await writeTextFile(notesPath, notesContent);
-      setLastSaved(new Date());
-      notesModifiedRef.current = false;
-      initialNotesRef.current = notesContent;
-    } catch (err) {
-      console.error("Failed to save notes:", err);
-      setError("Failed to save notes");
-    } finally {
-      setIsSaving(false);
-    }
-  }, [paper.path]);
+  const saveNotes = useCallback(
+    async (notesContent: string) => {
+      if (!notesModifiedRef.current) return;
+
+      setIsSaving(true);
+      try {
+        const notesPath = `${paper.path}/notes.md`;
+        await writeTextFile(notesPath, notesContent);
+        setLastSaved(new Date());
+        notesModifiedRef.current = false;
+        initialNotesRef.current = notesContent;
+      } catch (err) {
+        console.error("Failed to save notes:", err);
+        setError("Failed to save notes");
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [paper.path],
+  );
 
   // Handle notes change with debounced auto-save
-  const handleNotesChange = useCallback((newNotes: string) => {
-    setNotes(newNotes);
-    
-    // Mark as modified if different from initial
-    if (newNotes !== initialNotesRef.current) {
-      notesModifiedRef.current = true;
-    }
+  const handleNotesChange = useCallback(
+    (newNotes: string) => {
+      setNotes(newNotes);
 
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+      // Mark as modified if different from initial
+      if (newNotes !== initialNotesRef.current) {
+        notesModifiedRef.current = true;
+      }
 
-    // Set new timeout for auto-save
-    saveTimeoutRef.current = setTimeout(() => {
-      saveNotes(newNotes);
-    }, AUTO_SAVE_DELAY);
-  }, [saveNotes]);
+      // Clear existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // Set new timeout for auto-save
+      saveTimeoutRef.current = setTimeout(() => {
+        saveNotes(newNotes);
+      }, AUTO_SAVE_DELAY);
+    },
+    [saveNotes],
+  );
 
   // Cleanup timeout on unmount and save any pending changes
   useEffect(() => {
@@ -153,7 +159,11 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       {/* Save status indicator - subtle */}
       {(isSaving || lastSaved) && (
         <div className="fixed top-[calc(var(--titlebar-height)+0.5rem)] right-16 z-20 text-xs text-muted-foreground/50 py-2">
-          {isSaving ? "Saving..." : lastSaved ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : null}
+          {isSaving
+            ? "Saving..."
+            : lastSaved
+              ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+              : null}
         </div>
       )}
 
@@ -171,16 +181,15 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       )}
 
       {/* Main content */}
-      {isLoading ? (
-        <div className="h-screen flex items-center justify-center">
-          <div className="text-muted-foreground animate-pulse">Loading paper...</div>
-        </div>
-      ) : (
+      {isLoading ? // <div className="h-screen flex items-center justify-center">
+      //   <div className="text-muted-foreground animate-pulse">Loading paper...</div>
+      // </div>
+      null : (
         <>
           {/* Main scrollable paper content */}
-          <div 
-            className={`paper-scroll-container ${notesOpen ? 'with-notes' : ''}`}
-            style={notesOpen ? { marginRight: '40%' } : undefined}
+          <div
+            className={`paper-scroll-container ${notesOpen ? "with-notes" : ""}`}
+            style={notesOpen ? { marginRight: "40%" } : undefined}
           >
             <MarkdownViewer content={content} className="pb-32 px-6" />
           </div>

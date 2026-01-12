@@ -443,7 +443,8 @@
     );
 }
 
-.paper-scroll-container::after {
+/* Progressive blur only for top for now. */
+/*.paper-scroll-container::after {
     bottom: 0;
     background: linear-gradient(
         to top,
@@ -467,7 +468,7 @@
         transparent 100%
     );
 }
-
+*/
 /* When notes panel is open, adjust the blur to not cover the notes */
 .paper-scroll-container.with-notes::before,
 .paper-scroll-container.with-notes::after {

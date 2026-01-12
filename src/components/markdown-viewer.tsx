@@ -1,5 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
-import { renderMarkdownBody, parseFrontmatter, type ParsedFrontmatter } from "@/lib/markdown";
+import {
+  renderMarkdownBody,
+  parseFrontmatter,
+  type ParsedFrontmatter,
+} from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 
 interface MarkdownViewerProps {
@@ -31,7 +35,9 @@ export function MarkdownViewer({ content, className }: MarkdownViewerProps) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to render markdown");
+          setError(
+            err instanceof Error ? err.message : "Failed to render markdown",
+          );
         }
       } finally {
         if (!cancelled) {
@@ -48,11 +54,12 @@ export function MarkdownViewer({ content, className }: MarkdownViewerProps) {
   }, [content]);
 
   if (isLoading) {
-    return (
-      <div className={cn("flex items-center justify-center p-8", className)}>
-        <div className="text-muted-foreground animate-pulse">Rendering...</div>
-      </div>
-    );
+    return null;
+    // return (
+    //   <div className={cn("flex items-center justify-center p-8", className)}>
+    //     <div className="text-muted-foreground animate-pulse">Rendering...</div>
+    //   </div>
+    // );
   }
 
   if (error) {
@@ -70,15 +77,13 @@ export function MarkdownViewer({ content, className }: MarkdownViewerProps) {
         {frontmatter.title && (
           <h1 className="paper-title">{frontmatter.title}</h1>
         )}
-        
+
         {/* Paper authors */}
         {frontmatter.authors && frontmatter.authors.length > 0 && (
-          <div className="paper-authors">
-            {frontmatter.authors.join(" · ")}
-          </div>
+          <div className="paper-authors">{frontmatter.authors.join(" · ")}</div>
         )}
       </div>
-      
+
       {/* Paper body */}
       <div
         className="markdown-content"
