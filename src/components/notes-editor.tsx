@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, highlightActiveLine } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
@@ -51,9 +51,8 @@ const customTheme = EditorView.theme({
   },
 });
 
-export function NotesEditor({ value, onChange, className, placeholder }: NotesEditorProps) {
+export function NotesEditor({ value: initialValue, onChange, className, placeholder }: NotesEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
 
   // Keep onChange ref updated
@@ -61,7 +60,7 @@ export function NotesEditor({ value, onChange, className, placeholder }: NotesEd
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  // Initialize editor
+  // Initialize editor once on mount - fully uncontrolled after that
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -73,7 +72,7 @@ export function NotesEditor({ value, onChange, className, placeholder }: NotesEd
     });
 
     const state = EditorState.create({
-      doc: value,
+      doc: initialValue,
       extensions: [
         highlightActiveLine(),
         history(),
@@ -93,35 +92,11 @@ export function NotesEditor({ value, onChange, className, placeholder }: NotesEd
       parent: containerRef.current,
     });
 
-    viewRef.current = view;
-
     return () => {
       view.destroy();
-      viewRef.current = null;
     };
-  }, []); // Only run once on mount
-
-  // Update editor content when value prop changes externally
-  const updateContent = useCallback((newValue: string) => {
-    const view = viewRef.current;
-    if (!view) return;
-
-    const currentValue = view.state.doc.toString();
-    if (currentValue !== newValue) {
-      view.dispatch({
-        changes: {
-          from: 0,
-          to: currentValue.length,
-          insert: newValue,
-        },
-      });
-    }
-  }, []);
-
-  // Sync external value changes
-  useEffect(() => {
-    updateContent(value);
-  }, [value, updateContent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount - initialValue is intentionally not a dependency
 
   return (
     <div

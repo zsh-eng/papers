@@ -14,7 +14,7 @@ const AUTO_SAVE_DELAY = 1500;
 
 export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [content, setContent] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
+  const [initialNotes, setInitialNotes] = useState<string | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -26,8 +26,8 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref to track if notes have been modified
   const notesModifiedRef = useRef(false);
-  // Ref to track initial notes value for comparison
-  const initialNotesRef = useRef<string>("");
+  // Ref to track current notes value (not state to avoid re-renders)
+  const currentNotesRef = useRef<string>("");
 
   // Load content.md
   useEffect(() => {
@@ -53,14 +53,14 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       try {
         const notesPath = `${paper.path}/notes.md`;
         const text = await readTextFile(notesPath);
-        setNotes(text);
-        initialNotesRef.current = text;
+        setInitialNotes(text);
+        currentNotesRef.current = text;
       } catch (err) {
         // Notes file might not exist yet
         console.warn("Notes file not found, starting with empty:", err);
         const defaultNotes = `# Notes: ${paper.metadata.title}\n\n*Add your notes about this paper here.*\n`;
-        setNotes(defaultNotes);
-        initialNotesRef.current = defaultNotes;
+        setInitialNotes(defaultNotes);
+        currentNotesRef.current = defaultNotes;
       } finally {
         setIsLoadingNotes(false);
       }
@@ -79,7 +79,6 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         await writeTextFile(notesPath, notesContent);
         setLastSaved(new Date());
         notesModifiedRef.current = false;
-        initialNotesRef.current = notesContent;
       } catch (err) {
         console.error("Failed to save notes:", err);
         setError("Failed to save notes");
@@ -93,10 +92,10 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   // Handle notes change with debounced auto-save
   const handleNotesChange = useCallback(
     (newNotes: string) => {
-      setNotes(newNotes);
+      currentNotesRef.current = newNotes;
 
       // Mark as modified if different from initial
-      if (newNotes !== initialNotesRef.current) {
+      if (newNotes !== initialNotes) {
         notesModifiedRef.current = true;
       }
 
@@ -110,7 +109,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         saveNotes(newNotes);
       }, AUTO_SAVE_DELAY);
     },
-    [saveNotes],
+    [saveNotes, initialNotes],
   );
 
   // Cleanup timeout on unmount and save any pending changes
@@ -122,10 +121,10 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       // Save on unmount if modified
       if (notesModifiedRef.current) {
         const notesPath = `${paper.path}/notes.md`;
-        writeTextFile(notesPath, notes).catch(console.error);
+        writeTextFile(notesPath, currentNotesRef.current).catch(console.error);
       }
     };
-  }, [paper.path, notes]);
+  }, [paper.path]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -198,10 +197,10 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
           </div>
 
           {/* Fixed notes sidebar - starts below titlebar */}
-          {notesOpen && (
+          {notesOpen && initialNotes !== null && (
             <div className="fixed top-0 right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col pt-[var(--titlebar-height)]">
               <NotesEditor
-                value={notes}
+                value={initialNotes}
                 onChange={handleNotesChange}
                 className="flex-1 overflow-hidden"
                 placeholder="Start writing your notes..."
