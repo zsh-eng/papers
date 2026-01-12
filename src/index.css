@@ -332,6 +332,11 @@
   margin-right: auto;
   /* Ensure table doesn't get wider than viewport */
   overflow-x: auto;
+  /* Use sans-serif for better data readability */
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  text-align: left;
 }
 
 .markdown-content th,
@@ -343,6 +348,7 @@
 .markdown-content th {
   background-color: var(--muted);
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .markdown-content tr:nth-child(even) {
