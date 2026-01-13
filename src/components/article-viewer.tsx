@@ -23,7 +23,7 @@ export function ArticleViewer({
   return (
     <div className={cn(className)}>
       {/* Paper title hero section - positioned ~1/3 down */}
-      <div className="pt-[33vh] pb-16 max-w-[700px] mx-auto">
+      <div className="pt-[33vh] pb-16 max-w-175 mx-auto">
         {title && <h1 className="paper-title">{title}</h1>}
 
         {/* Paper authors */}

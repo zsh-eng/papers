@@ -7,6 +7,7 @@
 @import "@fontsource/eb-garamond/600.css";
 @import "@fontsource/eb-garamond/400-italic.css";
 @import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/instrument-serif";
 @import "katex/dist/katex.min.css";
 @import "highlight.js/styles/github.css";
 
@@ -136,7 +137,9 @@
     html,
     body {
         @apply font-sans bg-background text-foreground;
-        transition: background-color 0.3s ease, color 0.3s ease;
+        transition:
+            background-color 0.3s ease,
+            color 0.3s ease;
     }
 }
 
@@ -198,11 +201,12 @@
 
 /* Paper title styling */
 .paper-title {
-    font-family: "Iowan Old Style", "EB Garamond", Georgia, serif;
-    font-size: 3.75rem;
+    font-family:
+        "Instrument Serif", "Iowan Old Style", "EB Garamond", Georgia, serif;
+    font-size: 5rem;
     font-weight: 500;
     line-height: 1.1;
-    letter-spacing: -0.02em;
+    /*letter-spacing: -0.02em;*/
     margin-bottom: 1.5rem;
     text-align: left;
     text-wrap: balance;
