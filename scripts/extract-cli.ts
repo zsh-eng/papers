@@ -4,11 +4,12 @@
  *
  * Usage:
  *   bun run scripts/extract-cli.ts metadata <pdf>     # Extract metadata only
- *   bun run scripts/extract-cli.ts content <pdf>      # Extract content (requires metadata first)
+ *   bun run scripts/extract-cli.ts content <pdf>      # Extract content + render HTML
  *   bun run scripts/extract-cli.ts full <pdf>         # Run full pipeline
  *
  * Options:
  *   --output-dir, -o <dir>   Output directory (default: same as PDF)
+ *   --context, -c <text>     Additional context (citation, course info, etc.)
  *   --skip-figures           Skip figure bounding box extraction
  *   --help, -h               Show help
  *
@@ -16,6 +17,7 @@
  *   bun run scripts/extract-cli.ts metadata paper.pdf
  *   bun run scripts/extract-cli.ts content paper.pdf
  *   bun run scripts/extract-cli.ts full paper.pdf -o ./output
+ *   bun run scripts/extract-cli.ts full chapter.pdf --context "Smith, J. (2020). Chapter 3. In Book Title."
  */
 
 import { existsSync } from "fs";
@@ -23,6 +25,7 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
 import { extractContent } from "../src/lib/extract/content";
 import { extractMetadata } from "../src/lib/extract/metadata";
+import { renderToHtmlDocument } from "../src/lib/extract/render";
 import type {
   ExtractedContent,
   ExtractedMetadata,
@@ -65,11 +68,12 @@ ${colors.cyan}Usage:${colors.reset}
 
 ${colors.cyan}Commands:${colors.reset}
   metadata <pdf>    Extract metadata only (fast, ~3-8 seconds)
-  content <pdf>     Extract content and figures (slow, ~30-200 seconds)
-  full <pdf>        Run full pipeline (metadata + content)
+  content <pdf>     Extract content, render HTML (slow, ~30-200 seconds)
+  full <pdf>        Run full pipeline (metadata + content + HTML)
 
 ${colors.cyan}Options:${colors.reset}
   --output-dir, -o <dir>   Output directory (default: same as PDF)
+  --context, -c <text>     Additional context for extraction (citation, course info, etc.)
   --skip-figures           Skip figure bounding box extraction
   --help, -h               Show this help message
 
@@ -77,10 +81,12 @@ ${colors.cyan}Examples:${colors.reset}
   bun run scripts/extract-cli.ts metadata paper.pdf
   bun run scripts/extract-cli.ts content paper.pdf
   bun run scripts/extract-cli.ts full paper.pdf -o ./output
+  bun run scripts/extract-cli.ts full chapter.pdf -c "Smith, J. (2020). Chapter 3. In Book Title (pp. 45-67). Publisher."
 
 ${colors.cyan}Output Files:${colors.reset}
-  metadata:  <pdf>.meta.json
-  content:   <pdf>.content.json, <pdf>.md
+  meta.json       Bibliographic metadata (Zotero-compatible)
+  content.md      Markdown source
+  content.html    Pre-rendered HTML (ready for viewing)
 
 ${colors.cyan}Environment:${colors.reset}
   GEMINI_API_KEY    Required. Get your key at https://aistudio.google.com/apikey
@@ -91,11 +97,13 @@ function parseArgs(args: string[]): {
   command: string;
   pdfPath: string;
   outputDir: string;
+  context: string;
   skipFigures: boolean;
 } {
   let command = "";
   let pdfPath = "";
   let outputDir = "";
+  let context = "";
   let skipFigures = false;
 
   let i = 0;
@@ -107,6 +115,8 @@ function parseArgs(args: string[]): {
       process.exit(0);
     } else if (arg === "--output-dir" || arg === "-o") {
       outputDir = args[++i];
+    } else if (arg === "--context" || arg === "-c") {
+      context = args[++i];
     } else if (arg === "--skip-figures") {
       skipFigures = true;
     } else if (!command) {
@@ -117,7 +127,7 @@ function parseArgs(args: string[]): {
     i++;
   }
 
-  return { command, pdfPath, outputDir, skipFigures };
+  return { command, pdfPath, outputDir, context, skipFigures };
 }
 
 function getOutputPaths(pdfPath: string, outputDir: string) {
@@ -125,31 +135,46 @@ function getOutputPaths(pdfPath: string, outputDir: string) {
   const base = basename(pdfPath, ".pdf");
 
   return {
+    dir,
     metadataJson: join(dir, `${base}.meta.json`),
     contentJson: join(dir, `${base}.content.json`),
     markdown: join(dir, `${base}.md`),
+    html: join(dir, `${base}.html`),
   };
 }
 
 async function runMetadata(
   pdfPath: string,
   outputDir: string,
+  context?: string,
 ): Promise<ExtractedMetadata> {
   info(`Extracting metadata from ${basename(pdfPath)}...`);
+  if (context) {
+    log(
+      `   ${colors.dim}Context: ${context.slice(0, 60)}${context.length > 60 ? "..." : ""}${colors.reset}`,
+    );
+  }
   const startTime = Date.now();
 
-  const metadata = await extractMetadata(pdfPath);
+  const metadata = await extractMetadata(pdfPath, { context });
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
   const paths = getOutputPaths(pdfPath, outputDir);
   await writeFile(paths.metadataJson, JSON.stringify(metadata, null, 2));
 
+  // Format authors for display
+  const authorNames = metadata.authors
+    .map((a) => `${a.given} ${a.family}`)
+    .join(", ");
+
   success(`Metadata extracted in ${elapsed}s`);
   log(`   Type: ${colors.cyan}${metadata.type}${colors.reset}`);
   log(`   Title: ${metadata.title}`);
-  log(`   Authors: ${metadata.authors.join(", ") || "Unknown"}`);
+  log(`   Authors: ${authorNames || "Unknown"}`);
   log(`   Year: ${metadata.year || "Unknown"}`);
-  log(`   Pages: ${metadata.pageCount}`);
+  if (metadata.doi) log(`   DOI: ${metadata.doi}`);
+  if (metadata.journal) log(`   Journal: ${metadata.journal}`);
+  if (metadata.conference) log(`   Conference: ${metadata.conference}`);
   log(`   Output: ${paths.metadataJson}`);
 
   return metadata;
@@ -171,7 +196,7 @@ async function runContent(
     process.exit(1);
   }
 
-  // Load metadata to check type
+  // Load metadata to check type and get title
   const metadataRaw = await readFile(paths.metadataJson, "utf-8");
   const metadata: ExtractedMetadata = JSON.parse(metadataRaw);
 
@@ -185,16 +210,33 @@ async function runContent(
   const startTime = Date.now();
 
   const content = await extractContent(pdfPath, { skipFigures });
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  const extractTime = ((Date.now() - startTime) / 1000).toFixed(1);
 
-  // Save outputs
+  // Save markdown
   await writeFile(paths.contentJson, JSON.stringify(content, null, 2));
   await writeFile(paths.markdown, content.markdown);
 
-  success(`Content extracted in ${elapsed}s`);
+  success(`Content extracted in ${extractTime}s`);
   log(`   Markdown: ${content.markdown.length.toLocaleString()} chars`);
   log(`   Figures: ${content.figures.length}`);
+
+  // Render HTML
+  info(`Rendering HTML...`);
+  const renderStart = Date.now();
+  const html = await renderToHtmlDocument(content.markdown);
+  const renderTime = ((Date.now() - renderStart) / 1000).toFixed(1);
+  await writeFile(paths.html, html);
+
+  success(`HTML rendered in ${renderTime}s`);
   log(`   Output: ${paths.markdown}`);
+  log(`   Output: ${paths.html}`);
+
+  // TODO: Extract figures from bounding boxes using mupdf-js
+  if (content.figures.length > 0 && !skipFigures) {
+    info(
+      `Figure extraction not yet implemented (${content.figures.length} figures found)`,
+    );
+  }
 
   return content;
 }
@@ -203,6 +245,7 @@ async function runFull(
   pdfPath: string,
   outputDir: string,
   skipFigures: boolean,
+  context?: string,
 ) {
   // Ensure output directory exists
   if (outputDir && !existsSync(outputDir)) {
@@ -213,10 +256,10 @@ async function runFull(
   log("");
 
   // Phase 1: Metadata
-  const metadata = await runMetadata(pdfPath, outputDir);
+  const metadata = await runMetadata(pdfPath, outputDir, context);
   log("");
 
-  // Phase 2: Content (skip for slides)
+  // Phase 2: Content + HTML (skip for slides)
   if (metadata.type !== "slides") {
     await runContent(pdfPath, outputDir, skipFigures);
   } else {
@@ -229,7 +272,7 @@ async function runFull(
 
 async function main() {
   const args = process.argv.slice(2);
-  const { command, pdfPath, outputDir, skipFigures } = parseArgs(args);
+  const { command, pdfPath, outputDir, context, skipFigures } = parseArgs(args);
 
   if (!command || !pdfPath) {
     printHelp();
@@ -255,13 +298,13 @@ async function main() {
   try {
     switch (command) {
       case "metadata":
-        await runMetadata(pdfPath, outputDir);
+        await runMetadata(pdfPath, outputDir, context || undefined);
         break;
       case "content":
         await runContent(pdfPath, outputDir, skipFigures);
         break;
       case "full":
-        await runFull(pdfPath, outputDir, skipFigures);
+        await runFull(pdfPath, outputDir, skipFigures, context || undefined);
         break;
       default:
         error(`Unknown command: ${command}`);

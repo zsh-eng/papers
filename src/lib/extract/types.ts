@@ -113,10 +113,34 @@ export interface ExtractedContent {
 export interface MetadataOptions {
   /** Maximum pages to send (default: 3 for speed) */
   maxPages?: number;
+  /** User-provided context to help with extraction (citation, course info, etc.) */
+  context?: string;
 }
 
 /** Options for content extraction */
 export interface ContentOptions {
+  /** Skip figure bounding box extraction */
+  skipFigures?: boolean;
+}
+
+/** Options for the full extraction pipeline */
+export interface ExtractionOptions {
+  /** Output directory (default: same as PDF) */
+  outputDir?: string;
   /** Skip figure extraction */
   skipFigures?: boolean;
+  /** User-provided context (citation, course info, etc.) */
+  context?: string;
+}
+
+/** Result of full extraction pipeline - files written to disk */
+export interface ExtractionResult {
+  /** Path to meta.json */
+  metadataPath: string;
+  /** Path to content.md */
+  markdownPath: string;
+  /** Path to content.html */
+  htmlPath: string;
+  /** Paths to extracted figure images */
+  figurePaths: string[];
 }

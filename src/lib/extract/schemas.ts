@@ -4,26 +4,71 @@
 
 import { z } from "zod";
 
-/** Schema for document type */
-export const documentTypeSchema = z.enum(["paper", "slides", "document"]);
+/** Schema for document type - matches Zotero item types */
+export const documentTypeSchema = z.enum([
+  "article", // Journal article
+  "book", // Full book
+  "chapter", // Book chapter
+  "conference", // Conference paper
+  "thesis", // Dissertation/thesis
+  "report", // Technical report
+  "slides", // Presentation slides
+  "document", // Generic/unknown
+]);
+
+/** Schema for structured author name */
+export const authorSchema = z.object({
+  given: z.string().describe("Given/first name"),
+  family: z.string().describe("Family/last name"),
+});
 
 /** Schema for Phase 1: Metadata extraction response */
 export const metadataResponseSchema = z.object({
+  // Core fields
   type: documentTypeSchema.describe(
-    "Document type: 'paper' for academic papers/articles, 'slides' for presentations, 'document' for other",
+    "Document type: 'article' for journal papers, 'conference' for conference papers, 'chapter' for book chapters, 'book' for full books, 'thesis' for dissertations, 'report' for technical reports, 'slides' for presentations, 'document' for other",
   ),
   title: z.string().describe("Full title of the document"),
   authors: z
-    .array(z.string())
-    .describe("List of author names in order of appearance"),
+    .array(authorSchema)
+    .describe("List of authors with structured names"),
   year: z.number().nullable().describe("Publication year, null if not found"),
-  venue: z
+
+  // Identifiers
+  doi: z.string().nullable().describe("DOI identifier if present"),
+  url: z.string().nullable().describe("URL if no DOI available"),
+  isbn: z.string().nullable().describe("ISBN for books"),
+
+  // Journal article fields
+  journal: z.string().nullable().describe("Journal name for articles"),
+  volume: z.string().nullable().describe("Volume number"),
+  issue: z.string().nullable().describe("Issue number"),
+  pages: z.string().nullable().describe("Page range (e.g., '123-145')"),
+
+  // Book/chapter fields
+  bookTitle: z
     .string()
     .nullable()
-    .describe("Conference, journal, or publisher name"),
-  doi: z.string().nullable().describe("DOI identifier if present"),
+    .describe("Parent book title for chapters"),
+  publisher: z.string().nullable().describe("Publisher name"),
+  edition: z.string().nullable().describe("Edition (e.g., '2nd')"),
+  editors: z
+    .array(authorSchema)
+    .nullable()
+    .describe("Editors for edited volumes"),
+
+  // Conference fields
+  conference: z
+    .string()
+    .nullable()
+    .describe("Conference or venue name"),
+
+  // Content
   abstract: z.string().nullable().describe("Abstract or summary text"),
-  pageCount: z.number().describe("Total number of pages in the document"),
+  keywords: z
+    .array(z.string())
+    .nullable()
+    .describe("Keywords or tags"),
 });
 
 /** Schema for a single figure */
