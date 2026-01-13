@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import {
   listDirectory,
-  allowDirectory,
   createFile,
   createFolder,
   deleteItem,
@@ -59,9 +58,6 @@ export function useFileExplorer(): UseFileExplorerReturn {
   const setRoot = useCallback(
     async (path: string) => {
       try {
-        // First, allow access to this directory
-        await allowDirectory(path);
-
         setRootPath(path);
         setCurrentPath(path);
         setHistory([]);

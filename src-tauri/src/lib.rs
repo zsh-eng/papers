@@ -1,21 +1,11 @@
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{LogicalSize, Manager};
-use tauri_plugin_fs::FsExt;
 
 mod tabs;
 use tabs::{
     close_active_tab, close_tab, create_tab, get_tab_state, next_tab, prev_tab, switch_tab,
     switch_tab_by_index, update_current_tab_title, TabManager, TAB_BAR_HEIGHT,
 };
-
-#[tauri::command]
-fn allow_directory(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    let scope = app.fs_scope();
-    scope
-        .allow_directory(&path, true)
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -133,7 +123,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            allow_directory,
             create_tab,
             close_tab,
             close_active_tab,

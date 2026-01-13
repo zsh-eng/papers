@@ -1,4 +1,4 @@
-import { allowDirectory, createFolder, pathExists } from "@/lib/fs";
+import { createFolder, pathExists } from "@/lib/fs";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { useEffect, useState } from "react";
 
@@ -20,9 +20,6 @@ export function useWorkspace(): UseWorkspaceReturn {
         // Get the app data directory (e.g., ~/Library/Application Support/app.papers.reader/)
         const dataDir = await appDataDir();
         const papersPath = await join(dataDir, "papers");
-
-        // Allow access to the directory
-        await allowDirectory(dataDir);
 
         // Create papers subdirectory if it doesn't exist
         const papersExists = await pathExists(papersPath);

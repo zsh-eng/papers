@@ -8,7 +8,6 @@ import {
   type DirEntry,
   type FileInfo,
 } from "@tauri-apps/plugin-fs";
-import { invoke } from "@tauri-apps/api/core";
 
 export interface FileEntry {
   name: string;
@@ -17,13 +16,6 @@ export interface FileEntry {
   isFile: boolean;
   size?: number;
   modifiedAt?: Date;
-}
-
-/**
- * Request permission to access a directory by adding it to the allowed scope
- */
-export async function allowDirectory(path: string): Promise<void> {
-  await invoke("allow_directory", { path });
 }
 
 /**
