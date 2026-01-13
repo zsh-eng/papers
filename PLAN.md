@@ -23,7 +23,7 @@ Phase 1: Project Foundation
 - Store workspace path in Tauri's app data directory
 - Support multiple workspaces (future, but design for it)
 1.3 Workspace Structure Convention
-~/research/                    # User-selected workspace
+$APPDIR/                    # User-selected workspace
 ├── AGENTS.md                  # Agent context (conventions, recent activity)
 ├── papers/
 │   └── {hash}-{year}-{slug}/

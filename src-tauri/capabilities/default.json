@@ -30,6 +30,16 @@
       "allow": [{ "path": "$APPDATA/**" }]
     },
     {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        { "path": "$APPDATA/**" },
+        { "path": "$HOME/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DESKTOP/**" }
+      ]
+    },
+    {
       "identifier": "fs:allow-write",
       "allow": [{ "path": "$APPDATA/**" }]
     },
@@ -63,7 +73,13 @@
     },
     {
       "identifier": "fs:allow-copy-file",
-      "allow": [{ "path": "$APPDATA/**" }]
+      "allow": [
+        { "path": "$APPDATA/**" },
+        { "path": "$HOME/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DESKTOP/**" }
+      ]
     },
     {
       "identifier": "fs:allow-read-text-file",
