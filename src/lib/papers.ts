@@ -54,7 +54,9 @@ async function hashFile(data: Uint8Array): Promise<string> {
   view.set(data);
   const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  const hashHex = hashArray
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
   return hashHex.slice(0, 8);
 }
 
@@ -75,7 +77,7 @@ function slugify(text: string): string {
 function generatePaperFoldername(
   hash: string,
   year: number | null,
-  title: string
+  title: string,
 ): string {
   const slug = slugify(title);
   const yearStr = year || "unknown";
@@ -88,7 +90,7 @@ function generatePaperFoldername(
  */
 async function extractMetadata(
   _pdfPath: string,
-  originalFilename: string
+  originalFilename: string,
 ): Promise<PaperMetadata> {
   // Dummy metadata based on filename
   const titleFromFilename = originalFilename
@@ -112,7 +114,7 @@ async function extractMetadata(
  */
 async function extractContent(
   _pdfPath: string,
-  metadata: PaperMetadata
+  metadata: PaperMetadata,
 ): Promise<string> {
   const frontmatter = `---
 title: "${metadata.title}"
@@ -150,7 +152,7 @@ The full paper content will appear here once the PDF processing pipeline is inte
  */
 async function processPaper(
   papersDir: string,
-  sourcePath: string
+  sourcePath: string,
 ): Promise<Paper> {
   const filename = getFilename(sourcePath);
 
@@ -162,7 +164,11 @@ async function processPaper(
   const metadata = await extractMetadata(sourcePath, filename);
 
   // Generate folder name
-  const folderName = generatePaperFoldername(hash, metadata.year, metadata.title);
+  const folderName = generatePaperFoldername(
+    hash,
+    metadata.year,
+    metadata.title,
+  );
   const paperDir = `${papersDir}/${folderName}`;
 
   // Check if paper already exists (by hash prefix)
@@ -170,7 +176,7 @@ async function processPaper(
   const existingPaper = existingEntries.find((e) => e.name.startsWith(hash));
   if (existingPaper) {
     throw new Error(
-      `A paper with this content already exists: ${existingPaper.name}`
+      `A paper with this content already exists: ${existingPaper.name}`,
     );
   }
 
@@ -201,7 +207,7 @@ async function processPaper(
       highlights: [],
     },
     null,
-    2
+    2,
   );
   await writeTextFile(`${paperDir}/annotations.json`, annotationsContent);
 
@@ -226,7 +232,7 @@ async function processPaper(
  */
 export async function importPDFFromPath(
   workspacePath: string,
-  sourcePath: string
+  sourcePath: string,
 ): Promise<Paper> {
   const papersDir = getPapersDir(workspacePath);
 
@@ -355,7 +361,7 @@ export async function loadPaper(paperPath: string): Promise<Paper | null> {
  */
 async function loadPaperFromFolder(
   papersDir: string,
-  folderName: string
+  folderName: string,
 ): Promise<Paper | null> {
   const paperDir = `${papersDir}/${folderName}`;
   const pdfPath = `${paperDir}/index.pdf`;

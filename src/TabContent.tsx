@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { PaperLibrary } from "@/components/paper-library";
 import { PaperReader } from "@/components/paper-reader";
-import { Onboarding } from "@/components/onboarding";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { Paper } from "@/lib/papers";
@@ -17,8 +16,7 @@ export function TabContent() {
   const initialTabType = params.get("type") || "home";
   const paperPath = params.get("path");
 
-  const { workspacePath, isLoading: isWorkspaceLoading, setWorkspace, clearWorkspace } =
-    useWorkspace();
+  const { workspacePath, isLoading: isWorkspaceLoading } = useWorkspace();
 
   // Register tab keyboard shortcuts (shared hook, calls Rust directly)
   useTabKeyboardShortcuts();
@@ -90,23 +88,12 @@ export function TabContent() {
     await invoke("update_current_tab_title", { title: "Library" });
   }, []);
 
-  // Loading states
-  if (isWorkspaceLoading || isPaperLoading) {
+  // Loading states or workspace not ready
+  if (isWorkspaceLoading || isPaperLoading || !workspacePath) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
-    );
-  }
-
-  // No workspace selected - show onboarding
-  if (!workspacePath) {
-    return (
-      <>
-        {/* Titlebar drag region for window dragging */}
-        <div className="titlebar-drag-region" />
-        <Onboarding onComplete={setWorkspace} />
-      </>
     );
   }
 
@@ -119,7 +106,6 @@ export function TabContent() {
   return (
     <PaperLibrary
       workspacePath={workspacePath}
-      onChangeWorkspace={clearWorkspace}
       onSelectPaper={handleSelectPaper}
     />
   );

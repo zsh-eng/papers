@@ -56,9 +56,7 @@ export function usePapers(workspacePath: string | null): UsePapersReturn {
         } catch (err) {
           const filename = path.split("/").pop() || path;
           const message =
-            err instanceof Error
-              ? err.message
-              : `Failed to import ${filename}`;
+            err instanceof Error ? err.message : `Failed to import ${filename}`;
           errors.push(message);
           console.error("Failed to import PDF:", err);
         }

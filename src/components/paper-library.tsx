@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from "react";
 
 interface PaperLibraryProps {
   workspacePath: string;
-  onChangeWorkspace: () => void;
   onSelectPaper: (paper: Paper, openInNewTab: boolean) => void;
 }
 
