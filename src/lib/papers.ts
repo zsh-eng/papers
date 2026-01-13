@@ -29,6 +29,34 @@ export interface Paper {
   metadata: PaperMetadata;
 }
 
+// Library item types for folder-based navigation
+export interface LibraryFolder {
+  type: "folder";
+  name: string;
+  path: string;
+  itemCount: number;
+}
+
+export interface LibraryPaper {
+  type: "paper";
+  paper: Paper;
+}
+
+export type LibraryItem = LibraryFolder | LibraryPaper;
+
+/**
+ * Regex to identify paper folders: {8-char-hash}-{year|unknown}-{slug}
+ * Examples: a3f2b1c4-2017-attention-is-all-you-need, 12345678-unknown-some-paper
+ */
+const PAPER_FOLDER_REGEX = /^[a-f0-9]{8}-(unknown|\d{4})-.+$/;
+
+/**
+ * Check if a folder name matches the paper folder format
+ */
+export function isPaperFolder(folderName: string): boolean {
+  return PAPER_FOLDER_REGEX.test(folderName);
+}
+
 /**
  * Get the papers directory path for a workspace
  */
@@ -446,4 +474,103 @@ export async function listPapers(workspacePath: string): Promise<Paper[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Count the number of items (folders + papers) in a directory
+ */
+async function countDirectoryItems(dirPath: string): Promise<number> {
+  try {
+    const entries = await readDir(dirPath);
+    return entries.filter((e) => e.isDirectory).length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * List library items (folders and papers) from a specific directory path
+ * Used for folder-based navigation in the library view
+ */
+export async function listLibraryItems(
+  directoryPath: string,
+): Promise<LibraryItem[]> {
+  // Check if directory exists
+  if (!(await pathExists(directoryPath))) {
+    return [];
+  }
+
+  try {
+    const entries = await readDir(directoryPath);
+    const items: LibraryItem[] = [];
+
+    for (const entry of entries) {
+      // Only process directories
+      if (!entry.isDirectory) {
+        continue;
+      }
+
+      const entryPath = `${directoryPath}/${entry.name}`;
+
+      if (isPaperFolder(entry.name)) {
+        // This is a paper folder - load it as a paper
+        const paper = await loadPaper(entryPath);
+        if (paper) {
+          items.push({ type: "paper", paper });
+        }
+      } else {
+        // This is a regular folder - count its contents
+        const itemCount = await countDirectoryItems(entryPath);
+        items.push({
+          type: "folder",
+          name: entry.name,
+          path: entryPath,
+          itemCount,
+        });
+      }
+    }
+
+    // Sort: folders first (alphabetically), then papers (by year desc, then title asc)
+    return items.sort((a, b) => {
+      // Folders come first
+      if (a.type === "folder" && b.type === "paper") return -1;
+      if (a.type === "paper" && b.type === "folder") return 1;
+
+      // Both folders: sort alphabetically
+      if (a.type === "folder" && b.type === "folder") {
+        return a.name.localeCompare(b.name);
+      }
+
+      // Both papers: sort by year desc, then title asc
+      if (a.type === "paper" && b.type === "paper") {
+        const yearA = a.paper.metadata.year || 0;
+        const yearB = b.paper.metadata.year || 0;
+        if (yearB !== yearA) {
+          return yearB - yearA;
+        }
+        const titleA = (a.paper.metadata.title || a.paper.filename).toLowerCase();
+        const titleB = (b.paper.metadata.title || b.paper.filename).toLowerCase();
+        return titleA.localeCompare(titleB);
+      }
+
+      return 0;
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Import a PDF file into a specific directory (not just the root papers dir)
+ */
+export async function importPDFToDirectory(
+  targetDirectory: string,
+  sourcePath: string,
+): Promise<Paper> {
+  // Ensure target directory exists
+  if (!(await pathExists(targetDirectory))) {
+    await mkdir(targetDirectory, { recursive: true });
+  }
+
+  return processPaper(targetDirectory, sourcePath);
 }
