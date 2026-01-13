@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor } from "@/components/notes-editor";
 import {
-  renderMarkdownBodyCached,
   parseFrontmatter,
+  renderMarkdownBodyCached,
   type ParsedFrontmatter,
 } from "@/lib/markdown";
 import type { Paper } from "@/lib/papers";
+import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface PaperReaderProps {
   paper: Paper;
@@ -26,7 +26,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(true);
 
   // Ref to track pending save timeout
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -52,7 +52,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         // Render markdown to HTML (with caching)
         const result = await renderMarkdownBodyCached(
           markdown,
-          paper.contentPath
+          paper.contentPath,
         );
         setHtml(result.html);
 
@@ -61,7 +61,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
           console.debug("[PaperReader] Cache HIT");
         } else {
           console.debug(
-            `[PaperReader] Cache MISS - rendered in ${result.renderTimeMs?.toFixed(2)}ms`
+            `[PaperReader] Cache MISS - rendered in ${result.renderTimeMs?.toFixed(2)}ms`,
           );
         }
       } catch (err) {
@@ -114,7 +114,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         setIsSaving(false);
       }
     },
-    [paper.path]
+    [paper.path],
   );
 
   // Handle notes change with debounced auto-save
@@ -137,7 +137,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         saveNotes(newNotes);
       }, AUTO_SAVE_DELAY);
     },
-    [saveNotes, initialNotes]
+    [saveNotes, initialNotes],
   );
 
   // Cleanup timeout on unmount and save any pending changes
