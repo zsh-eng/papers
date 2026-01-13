@@ -62,9 +62,7 @@ export function usePaperLibrary(
       const libraryItems = await listLibraryItems(dirPath);
       setItems(libraryItems);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load directory",
-      );
+      setError(err instanceof Error ? err.message : "Failed to load directory");
       setItems([]);
     } finally {
       setIsLoading(false);
@@ -143,6 +141,7 @@ export function usePaperLibrary(
         // Refresh the view
         await loadDirectory(effectiveCurrentPath);
       } catch (err) {
+        console.error(err);
         setError(
           err instanceof Error ? err.message : "Failed to import papers",
         );
