@@ -6,6 +6,7 @@ import remarkRehype from "remark-rehype";
 import rehypeKatex from "rehype-katex";
 import rehypeHighlight from "rehype-highlight";
 import rehypeStringify from "rehype-stringify";
+import { getCachedHtml, type CachedRenderResult } from "./markdown-cache";
 
 export interface ParsedFrontmatter {
   title?: string;
@@ -150,4 +151,22 @@ export async function renderMarkdownBody(markdown: string): Promise<string> {
   const contentWithoutFrontmatter = stripFrontmatter(markdown);
   const contentWithoutHeading = stripFirstHeading(contentWithoutFrontmatter);
   return renderMarkdown(contentWithoutHeading);
+}
+
+/**
+ * Render markdown content to HTML with caching support.
+ * Uses xxhash to validate cache - only re-renders if content has changed.
+ *
+ * @param markdown - The markdown content (may include frontmatter)
+ * @param contentPath - Path to the source file (used for cache file location)
+ * @returns Rendered HTML and cache metadata
+ */
+export async function renderMarkdownBodyCached(
+  markdown: string,
+  contentPath: string
+): Promise<CachedRenderResult> {
+  const contentWithoutFrontmatter = stripFrontmatter(markdown);
+  const contentWithoutHeading = stripFirstHeading(contentWithoutFrontmatter);
+
+  return getCachedHtml(contentPath, contentWithoutHeading, renderMarkdown);
 }

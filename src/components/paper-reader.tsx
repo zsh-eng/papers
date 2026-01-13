@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { MarkdownViewer } from "@/components/markdown-viewer";
+import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor } from "@/components/notes-editor";
+import {
+  renderMarkdownBodyCached,
+  parseFrontmatter,
+  type ParsedFrontmatter,
+} from "@/lib/markdown";
 import type { Paper } from "@/lib/papers";
 
 interface PaperReaderProps {
@@ -13,7 +18,8 @@ interface PaperReaderProps {
 const AUTO_SAVE_DELAY = 1500;
 
 export function PaperReader({ paper, onBack }: PaperReaderProps) {
-  const [content, setContent] = useState<string>("");
+  const [html, setHtml] = useState<string>("");
+  const [frontmatter, setFrontmatter] = useState<ParsedFrontmatter>({});
   const [initialNotes, setInitialNotes] = useState<string | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
@@ -29,13 +35,35 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   // Ref to track current notes value (not state to avoid re-renders)
   const currentNotesRef = useRef<string>("");
 
-  // Load content.md
+  // Load and render content.md
   useEffect(() => {
-    async function loadContent() {
+    async function loadAndRenderContent() {
       setIsLoadingContent(true);
       try {
-        const text = await readTextFile(paper.contentPath);
-        setContent(text);
+        // Read the markdown file
+        console.time("readTextFile");
+        const markdown = await readTextFile(paper.contentPath);
+        console.timeEnd("readTextFile");
+
+        // Parse frontmatter (synchronous, fast)
+        const fm = parseFrontmatter(markdown);
+        setFrontmatter(fm);
+
+        // Render markdown to HTML (with caching)
+        const result = await renderMarkdownBodyCached(
+          markdown,
+          paper.contentPath
+        );
+        setHtml(result.html);
+
+        // Log performance info
+        if (result.fromCache) {
+          console.debug("[PaperReader] Cache HIT");
+        } else {
+          console.debug(
+            `[PaperReader] Cache MISS - rendered in ${result.renderTimeMs?.toFixed(2)}ms`
+          );
+        }
       } catch (err) {
         console.error("Failed to load content:", err);
         setError("Failed to load paper content");
@@ -43,7 +71,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         setIsLoadingContent(false);
       }
     }
-    loadContent();
+    loadAndRenderContent();
   }, [paper.contentPath]);
 
   // Load notes.md
@@ -86,7 +114,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         setIsSaving(false);
       }
     },
-    [paper.path],
+    [paper.path]
   );
 
   // Handle notes change with debounced auto-save
@@ -109,7 +137,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         saveNotes(newNotes);
       }, AUTO_SAVE_DELAY);
     },
-    [saveNotes, initialNotes],
+    [saveNotes, initialNotes]
   );
 
   // Cleanup timeout on unmount and save any pending changes
@@ -136,7 +164,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
           activeElement instanceof HTMLInputElement ||
           activeElement instanceof HTMLTextAreaElement ||
           activeElement?.hasAttribute("contenteditable");
-        
+
         // Don't handle Esc if an input element is focused or if any modal/dialog might be open
         if (!isInputFocused && activeElement === document.body) {
           onBack();
@@ -183,17 +211,19 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       )}
 
       {/* Main content */}
-      {isLoading ? // <div className="h-screen flex items-center justify-center">
-      //   <div className="text-muted-foreground animate-pulse">Loading paper...</div>
-      // </div>
-      null : (
+      {isLoading ? null : (
         <>
           {/* Main scrollable paper content */}
           <div
             className={`paper-scroll-container ${notesOpen ? "with-notes" : ""}`}
             style={notesOpen ? { marginRight: "40%" } : undefined}
           >
-            <MarkdownViewer content={content} className="pb-32 px-6" />
+            <ArticleViewer
+              html={html}
+              title={frontmatter.title}
+              authors={frontmatter.authors}
+              className="pb-32 px-6"
+            />
           </div>
 
           {/* Fixed notes sidebar - starts below titlebar */}
