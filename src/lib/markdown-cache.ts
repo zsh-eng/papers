@@ -27,14 +27,14 @@ export async function hashContent(content: string): Promise<string> {
 
 /**
  * Get the cache file path for a given content.md path
- * e.g., /path/to/paper/content.md -> /path/to/paper/.content.cache.html
+ * e.g., /path/to/paper/content.md -> /path/to/paper/_content.cache.html
  */
 export function getCachePath(contentPath: string): string {
   const lastSlash = contentPath.lastIndexOf("/");
   const dir = contentPath.slice(0, lastSlash);
   const filename = contentPath.slice(lastSlash + 1);
   // content.md -> .content.cache.html
-  const cacheFilename = "." + filename.replace(/\.md$/, ".cache.html");
+  const cacheFilename = "_" + filename.replace(/\.md$/, ".cache.html");
   return `${dir}/${cacheFilename}`;
 }
 
@@ -59,7 +59,7 @@ async function readCache(cachePath: string): Promise<CacheData | null> {
 
     const hash = cacheContent.slice(0, separatorIndex);
     const html = cacheContent.slice(
-      separatorIndex + CACHE_HEADER_SEPARATOR.length
+      separatorIndex + CACHE_HEADER_SEPARATOR.length,
     );
 
     return { hash, html };
@@ -75,7 +75,7 @@ async function readCache(cachePath: string): Promise<CacheData | null> {
 async function writeCache(
   cachePath: string,
   hash: string,
-  html: string
+  html: string,
 ): Promise<void> {
   const cacheContent = hash + CACHE_HEADER_SEPARATOR + html;
   await writeTextFile(cachePath, cacheContent);
@@ -98,7 +98,7 @@ export interface CachedRenderResult {
 export async function getCachedHtml(
   contentPath: string,
   markdown: string,
-  renderFn: (markdown: string) => Promise<string>
+  renderFn: (markdown: string) => Promise<string>,
 ): Promise<CachedRenderResult> {
   const cachePath = getCachePath(contentPath);
   const contentHash = await hashContent(markdown);
@@ -117,7 +117,7 @@ export async function getCachedHtml(
 
   // Cache miss - need to render
   console.debug(
-    `[Cache] MISS for ${contentPath} (${cached ? "hash mismatch" : "no cache file"})`
+    `[Cache] MISS for ${contentPath} (${cached ? "hash mismatch" : "no cache file"})`,
   );
 
   const startTime = performance.now();
