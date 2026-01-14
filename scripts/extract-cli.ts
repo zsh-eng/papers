@@ -12,6 +12,7 @@
  * Usage:
  *   bun run scripts/extract-cli.ts metadata <pdf>     # Extract metadata + figures
  *   bun run scripts/extract-cli.ts content <pdf>      # Extract content + render HTML
+ *   bun run scripts/extract-cli.ts figures <pdf>      # Extract figure images from bounding boxes
  *   bun run scripts/extract-cli.ts full <pdf>         # Run full pipeline (recommended)
  *
  * Options:
@@ -29,6 +30,10 @@ import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
 import { extractContent } from "../src/lib/extract/content";
+import {
+  checkPdftocairoAvailable,
+  extractAllFigures,
+} from "../src/lib/extract/figure";
 import { extractMetadata } from "../src/lib/extract/metadata";
 import { renderToHtmlDocument } from "../src/lib/extract/render";
 import type { ExtractedMetadata } from "../src/lib/extract/types";
@@ -101,6 +106,7 @@ ${colors.cyan}Commands:${colors.reset}
   full <pdf>        Run full pipeline (recommended)
   metadata <pdf>    Extract metadata only (~5-15 seconds)
   content <pdf>     Extract content only (requires metadata first)
+  figures <pdf>     Extract figure images (requires metadata first)
 
 ${colors.cyan}Options:${colors.reset}
   --output-dir, -o <dir>   Parent directory for paper folder (default: same as PDF)
@@ -122,7 +128,10 @@ ${colors.cyan}Output Structure:${colors.reset}
   {year}-{title-slug}/
     ├── meta.json       Bibliographic metadata + figure bounding boxes
     ├── content.md      Markdown source
-    └── content.html    Pre-rendered HTML (ready for viewing)
+    ├── content.html    Pre-rendered HTML (ready for viewing)
+    └── figures/        Extracted figure images (if any)
+        ├── fig_1-1.png
+        └── fig_2-3.png  (format: {id}-{page}.png)
 
 ${colors.cyan}Environment:${colors.reset}
   GEMINI_API_KEY    Required. Get your key at https://aistudio.google.com/apikey
@@ -267,14 +276,53 @@ async function runContent(
   log(`   Output: ${paths.markdown}`);
   log(`   Output: ${paths.html}`);
 
-  // TODO: Extract figures from bounding boxes using pdftocairo
+  // Extract figures if any were found
   if (metadata.figures.length > 0) {
-    info(
-      `Figure extraction not yet implemented (${metadata.figures.length} figures found)`,
-    );
+    await runFigures(pdfPath, paperDir, metadata);
   }
 
   return markdown;
+}
+
+/**
+ * Extract figures from PDF using bounding boxes in metadata.
+ * Saves figures to a figures/ subdirectory in the paper folder.
+ */
+async function runFigures(
+  pdfPath: string,
+  paperDir: string,
+  metadata: ExtractedMetadata,
+): Promise<string[]> {
+  if (metadata.figures.length === 0) {
+    info(`No figures found in metadata`);
+    return [];
+  }
+
+  // Check for pdftocairo
+  if (!checkPdftocairoAvailable()) {
+    error(`pdftocairo not found. Install poppler-utils:`);
+    log(`   macOS: brew install poppler`);
+    log(`   Ubuntu: apt install poppler-utils`);
+    return [];
+  }
+
+  const figuresDir = join(paperDir, "figures");
+  info(`Extracting ${metadata.figures.length} figures...`);
+  const startTime = Date.now();
+
+  const paths = await extractAllFigures(pdfPath, metadata.figures, figuresDir);
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+  if (paths.length > 0) {
+    success(`Extracted ${paths.length} figures in ${elapsed}s`);
+    for (const path of paths) {
+      log(`   ${colors.dim}${path}${colors.reset}`);
+    }
+  } else {
+    error(`Failed to extract figures`);
+  }
+
+  return paths;
 }
 
 /**
@@ -357,6 +405,24 @@ async function main() {
         const metadataRaw = await readFile(paths.metadataJson, "utf-8");
         const metadata: ExtractedMetadata = JSON.parse(metadataRaw);
         await runContent(pdfPath, outputDir, metadata);
+        break;
+      }
+      case "figures": {
+        // Figures requires a paper folder with meta.json
+        if (!outputDir) {
+          error(`Figures command requires --output-dir pointing to the paper folder.`);
+          error(`Run 'metadata' first to create the folder, or use 'full' for the complete pipeline.`);
+          process.exit(1);
+        }
+        const figPaths = getOutputPaths(outputDir);
+        if (!existsSync(figPaths.metadataJson)) {
+          error(`Metadata file not found: ${figPaths.metadataJson}`);
+          error(`Run 'metadata' command first, or use 'full' for the complete pipeline.`);
+          process.exit(1);
+        }
+        const figMetadataRaw = await readFile(figPaths.metadataJson, "utf-8");
+        const figMetadata: ExtractedMetadata = JSON.parse(figMetadataRaw);
+        await runFigures(pdfPath, outputDir, figMetadata);
         break;
       }
       case "full":

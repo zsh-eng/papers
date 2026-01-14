@@ -52,7 +52,7 @@ Scan the ENTIRE document for figures, images, diagrams, and charts.
 
 For each figure:
 1. Assign a unique ID: "fig_1", "fig_2", etc. in order of appearance
-2. Record the page number (1-indexed)
+2. Record the page number (0-indexed)
 3. Identify the bounding box [x1, y1, x2, y2] in PDF points (72 points = 1 inch)
    - Coordinates start from top-left of the page
    - Include the entire figure and its caption
