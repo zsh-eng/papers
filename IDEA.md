@@ -18,18 +18,28 @@ Output files written to library
 User views in Papers app
 ```
 
+### Extraction Pipeline
+
+The extraction happens in two phases:
+
+1. **Metadata + Figures** (Phase 1): Extracts bibliographic metadata and figure bounding boxes using structured output. This is relatively fast (~5-15 seconds).
+
+2. **Content** (Phase 2): Converts the PDF to markdown. Returns plain text (no JSON schema) to maximize extraction quality. Slower (~30-200 seconds depending on length).
+
+This separation allows the content extraction model to focus entirely on accurate text conversion without also tracking figure coordinates.
+
 ## Directory Structure
 
 All items live in `$APPDIR/papers/`. Each processed PDF produces:
 
 ```
 paper-name/
-├── meta.json       # Bibliographic metadata (Zotero-compatible)
+├── meta.json       # Bibliographic metadata + figure bounding boxes
 ├── source.pdf      # Original PDF file
 ├── content.md      # Extracted markdown
 ├── content.html    # Pre-rendered HTML (app loads this directly)
 ├── notes.md        # User's notes (created manually or by agent)
-└── figures/        # Extracted figures from the PDF that are linked to in the markdown
+└── figures/        # Extracted figures from the PDF
     ├── fig_1.png
     └── fig_2.png
 ```
@@ -47,10 +57,11 @@ bun run scripts/extract-cli.ts
 ### Commands
 
 ```bash
-# Extract metadata only (fast, ~3-8 seconds)
+# Extract metadata + figure bounding boxes (~5-15 seconds)
 bun run scripts/extract-cli.ts metadata <pdf>
 
-# Extract content + render HTML (slow, ~30-200 seconds)
+# Extract content + render HTML (~30-200 seconds)
+# Requires metadata to be extracted first
 bun run scripts/extract-cli.ts content <pdf>
 
 # Full pipeline: metadata + content + HTML
@@ -63,7 +74,6 @@ bun run scripts/extract-cli.ts full <pdf>
 | ------------------------ | ------------------------------------------------ |
 | `--output-dir, -o <dir>` | Output directory (default: same as PDF)          |
 | `--context, -c <text>`   | Additional context (citation, course info, etc.) |
-| `--skip-figures`         | Skip figure bounding box extraction              |
 
 ### Examples
 
@@ -91,7 +101,7 @@ export GEMINI_API_KEY=your_key  # Required
 
 ## Metadata Fields
 
-The `meta.json` file contains Zotero-compatible bibliographic data:
+The `meta.json` file contains Zotero-compatible bibliographic data plus figure information.
 
 ### Core Fields (always present)
 
@@ -127,6 +137,14 @@ The `meta.json` file contains Zotero-compatible bibliographic data:
 
 - `abstract`: Abstract text
 - `keywords`: Array of keywords
+
+### Figures
+
+- `figures`: Array of figure objects with:
+  - `id`: Unique identifier (e.g., "fig_1")
+  - `page`: Page number (0-indexed)
+  - `bbox`: Bounding box [x1, y1, x2, y2] in PDF points
+  - `caption`: Caption text if found
 
 ### Processing Metadata
 
@@ -183,3 +201,4 @@ grep -l '"type": "conference"' ~/papers/*/meta.json
 - Processing is intentionally manual/agent-driven for flexibility
 - Use `--context` to provide information not in the PDF (citations, course info)
 - Figure extraction spawns a subprocess and uses pdftocairo for the extraction
+- The content extraction uses plain text output (no JSON schema) to maximize quality

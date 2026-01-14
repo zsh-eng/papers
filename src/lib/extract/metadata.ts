@@ -1,8 +1,8 @@
 /**
- * Phase 1: Metadata extraction from PDF.
+ * Phase 1: Metadata and figure extraction from PDF.
  *
- * Fast extraction (~3-8 seconds) of document type and bibliographic metadata.
- * Only sends first few pages to minimize latency.
+ * Extracts document type, bibliographic metadata, and figure bounding boxes.
+ * Uses structured output for reliable parsing.
  */
 
 import { readFile } from "fs/promises";
@@ -11,9 +11,13 @@ import { EXTRACTION_MODEL, getGeminiClient } from "./client";
 import { metadataResponseSchema } from "./schemas";
 import type { ExtractedMetadata, MetadataOptions } from "./types";
 
-const METADATA_PROMPT = `Analyze this PDF document and extract bibliographic metadata for citation purposes.
+const METADATA_PROMPT = `Analyze this PDF document and extract:
+1. Bibliographic metadata for citation purposes
+2. Figure locations and bounding boxes
 
-First, determine the document type:
+## Document Type Classification
+
+Determine the document type:
 - "article": Journal article (has journal name, volume, issue)
 - "conference": Conference paper (has conference name like NeurIPS, ICML, CHI)
 - "chapter": Book chapter (part of a larger book)
@@ -23,7 +27,9 @@ First, determine the document type:
 - "slides": Presentation slides
 - "document": Other/unknown
 
-Then extract all available metadata. Be thorough - this will be used for generating citations.
+## Metadata Extraction
+
+Extract all available metadata. Be thorough - this will be used for generating citations.
 
 For authors:
 - Extract both given (first) and family (last) names separately
@@ -38,20 +44,34 @@ For articles: Extract journal name, volume, issue, page range
 For chapters: Extract parent book title, editors, publisher
 For conference papers: Extract conference name
 
-If you cannot find a piece of information, use null for that field.`;
+If you cannot find a piece of information, use null for that field.
+
+## Figure Extraction
+
+Scan the ENTIRE document for figures, images, diagrams, and charts.
+
+For each figure:
+1. Assign a unique ID: "fig_1", "fig_2", etc. in order of appearance
+2. Record the page number (0-indexed)
+3. Identify the bounding box [x1, y1, x2, y2] in PDF points (72 points = 1 inch)
+   - Coordinates start from top-left of the page
+   - Include the entire figure and its caption
+4. Extract the caption text if visible
+
+Include ALL figures in the document, not just the first few pages.`;
 
 /**
- * Extract metadata from a PDF file.
+ * Extract metadata and figure locations from a PDF file.
  *
  * @param pdfPath - Path to the PDF file
  * @param options - Extraction options
- * @returns Extracted metadata
+ * @returns Extracted metadata including figure bounding boxes
  */
 export async function extractMetadata(
   pdfPath: string,
   options: MetadataOptions = {},
 ): Promise<ExtractedMetadata> {
-  const { maxPages = 3, context } = options;
+  const { context } = options;
 
   const client = getGeminiClient();
 
@@ -61,7 +81,6 @@ export async function extractMetadata(
 
   // Build prompt with optional context
   let prompt = METADATA_PROMPT;
-  prompt += `\n\nNote: Focus on the first ${maxPages} pages for metadata extraction.`;
 
   if (context) {
     prompt += `\n\n## Additional Context Provided by User\n${context}\n\nUse this context to help fill in metadata fields that may not be visible in the PDF itself (e.g., citation information, book title for chapters, etc.).`;

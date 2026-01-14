@@ -22,7 +22,17 @@ export const authorSchema = z.object({
   family: z.string().describe("Family/last name"),
 });
 
-/** Schema for Phase 1: Metadata extraction response */
+/** Schema for a single figure */
+export const figureSchema = z.object({
+  id: z.string().describe("Unique identifier like 'fig_1', 'fig_2'"),
+  page: z.number().describe("Page number (0-indexed)"),
+  bbox: z
+    .tuple([z.number(), z.number(), z.number(), z.number()])
+    .describe("Bounding box [x1, y1, x2, y2] in PDF points from top-left"),
+  caption: z.string().nullable().describe("Figure caption if found"),
+});
+
+/** Schema for Phase 1: Metadata + figures extraction response */
 export const metadataResponseSchema = z.object({
   // Core fields
   type: documentTypeSchema.describe(
@@ -69,26 +79,12 @@ export const metadataResponseSchema = z.object({
     .array(z.string())
     .nullable()
     .describe("Keywords or tags"),
-});
 
-/** Schema for a single figure */
-export const figureSchema = z.object({
-  id: z.string().describe("Unique identifier like 'fig_1', 'fig_2'"),
-  page: z.number().describe("Page number (0-indexed)"),
-  bbox: z
-    .tuple([z.number(), z.number(), z.number(), z.number()])
-    .describe("Bounding box [x1, y1, x2, y2] in PDF points from top-left"),
-  caption: z.string().nullable().describe("Figure caption if found"),
-});
-
-/** Schema for Phase 2: Content extraction response */
-export const contentResponseSchema = z.object({
-  markdown: z.string().describe("Full document content as clean markdown"),
+  // Figures
   figures: z
     .array(figureSchema)
-    .describe("List of figures with bounding boxes"),
+    .describe("List of figures with bounding boxes for extraction"),
 });
 
 export type MetadataResponse = z.infer<typeof metadataResponseSchema>;
-export type ContentResponse = z.infer<typeof contentResponseSchema>;
 export type FigureResponse = z.infer<typeof figureSchema>;
