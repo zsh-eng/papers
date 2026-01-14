@@ -1,29 +1,22 @@
-import {
-  readDir,
-  stat,
-  copyFile,
-  mkdir,
-  writeTextFile,
-  readTextFile,
-  readFile,
-} from "@tauri-apps/plugin-fs";
+import { readDir, stat, readTextFile } from "@tauri-apps/plugin-fs";
 import { pathExists } from "@/lib/fs";
+import type { ExtractedMetadata, Author } from "@/lib/extract/types";
 
 export interface PaperMetadata {
+  type: string;
   title: string;
-  authors: string[];
+  authors: string[]; // Formatted as "Given Family" for display
   year: number | null;
   doi: string | null;
   abstract: string | null;
-  tags: string[];
+  keywords: string[] | null;
 }
 
 export interface Paper {
-  id: string; // folder name: {hash}-{year}-{slug}
-  filename: string; // original filename
+  id: string; // folder name
   path: string; // path to paper folder
-  pdfPath: string; // path to index.pdf
-  contentPath: string; // path to content.md
+  pdfPath: string; // path to source.pdf
+  htmlPath: string; // path to content.html
   addedAt: Date;
   size: number;
   metadata: PaperMetadata;
@@ -45,10 +38,10 @@ export interface LibraryPaper {
 export type LibraryItem = LibraryFolder | LibraryPaper;
 
 /**
- * Regex to identify paper folders: {8-char-hash}-{year|unknown}-{slug}
- * Examples: a3f2b1c4-2017-attention-is-all-you-need, 12345678-unknown-some-paper
+ * Regex to identify paper folders: {year}-{slug}
+ * Examples: 2017-attention-is-all-you-need, unknown-some-paper
  */
-const PAPER_FOLDER_REGEX = /^[a-f0-9]{8}-(unknown|\d{4})-.+$/;
+const PAPER_FOLDER_REGEX = /^(\d{4}|unknown)-.+$/;
 
 /**
  * Check if a folder name matches the paper folder format
@@ -65,319 +58,60 @@ export function getPapersDir(workspacePath: string): string {
 }
 
 /**
- * Extract filename from a file path
+ * Format Author[] to string[] for display
  */
-function getFilename(filePath: string): string {
-  return filePath.split("/").pop() || filePath;
+function formatAuthors(authors: Author[]): string[] {
+  return authors.map((a) => `${a.given} ${a.family}`);
 }
 
 /**
- * Simple hash function for generating paper IDs
- * Returns first 8 characters of a hex hash
- */
-async function hashFile(data: Uint8Array): Promise<string> {
-  // Create a new ArrayBuffer from the data
-  const buffer = new ArrayBuffer(data.length);
-  const view = new Uint8Array(buffer);
-  view.set(data);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return hashHex.slice(0, 8);
-}
-
-/**
- * Generate a URL-safe slug from a title
- */
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 50);
-}
-
-/**
- * Generate the paper folder name: {hash}-{year}-{slug}
- */
-function generatePaperFoldername(
-  hash: string,
-  year: number | null,
-  title: string,
-): string {
-  const slug = slugify(title);
-  const yearStr = year || "unknown";
-  return `${hash}-${yearStr}-${slug}`;
-}
-
-/**
- * TODO: Implement actual PDF processing with Gemini/extract_unified.py
- * For now, returns dummy metadata
- */
-async function extractMetadata(
-  _pdfPath: string,
-  originalFilename: string,
-): Promise<PaperMetadata> {
-  // Dummy metadata based on filename
-  const titleFromFilename = originalFilename
-    .replace(/\.pdf$/i, "")
-    .replace(/[-_]/g, " ");
-
-  return {
-    title: titleFromFilename,
-    authors: ["Unknown Author"],
-    year: new Date().getFullYear(),
-    doi: null,
-    abstract:
-      "Abstract not yet extracted. This is placeholder text that will be replaced when the PDF processing pipeline is fully implemented.",
-    tags: [],
-  };
-}
-
-/**
- * TODO: Implement actual PDF to markdown conversion with extract_unified.py
- * For now, returns dummy content
- */
-async function extractContent(
-  _pdfPath: string,
-  metadata: PaperMetadata,
-): Promise<string> {
-  const frontmatter = `---
-title: "${metadata.title}"
-authors:
-${metadata.authors.map((a) => `  - "${a}"`).join("\n")}
-year: ${metadata.year || "null"}
-doi: ${metadata.doi ? `"${metadata.doi}"` : "null"}
-tags: [${metadata.tags.map((t) => `"${t}"`).join(", ")}]
----
-
-`;
-
-  const content = `# ${metadata.title}
-
-${metadata.authors.join(", ")}${metadata.year ? ` (${metadata.year})` : ""}
-
-## Abstract
-
-${metadata.abstract || "No abstract available."}
-
-## Content
-
-*Content extraction not yet implemented. This is placeholder text.*
-
-The full paper content will appear here once the PDF processing pipeline is integrated with extract_unified.py.
-
-<!-- TODO: Implement PDF processing with uv run extract_unified.py -->
-`;
-
-  return frontmatter + content;
-}
-
-/**
- * Process a PDF file and create the paper folder structure
- */
-async function processPaper(
-  papersDir: string,
-  sourcePath: string,
-): Promise<Paper> {
-  const filename = getFilename(sourcePath);
-
-  // Read the PDF file for hashing
-  const pdfData = await readFile(sourcePath);
-  const hash = await hashFile(pdfData);
-
-  // Extract metadata (dummy for now)
-  const metadata = await extractMetadata(sourcePath, filename);
-
-  // Generate folder name
-  const folderName = generatePaperFoldername(
-    hash,
-    metadata.year,
-    metadata.title,
-  );
-  const paperDir = `${papersDir}/${folderName}`;
-
-  // Check if paper already exists (by hash prefix)
-  const existingEntries = await readDir(papersDir).catch(() => []);
-  const existingPaper = existingEntries.find((e) => e.name.startsWith(hash));
-  if (existingPaper) {
-    throw new Error(
-      `A paper with this content already exists: ${existingPaper.name}`,
-    );
-  }
-
-  // Create folder structure
-  await mkdir(paperDir, { recursive: true });
-  await mkdir(`${paperDir}/figures`, { recursive: true });
-
-  // Copy PDF as index.pdf
-  const pdfPath = `${paperDir}/index.pdf`;
-  await copyFile(sourcePath, pdfPath);
-
-  // Generate and save content.md
-  const content = await extractContent(sourcePath, metadata);
-  const contentPath = `${paperDir}/content.md`;
-  await writeTextFile(contentPath, content);
-
-  // Create empty notes.md
-  const notesContent = `# Notes: ${metadata.title}
-
-*Add your notes about this paper here.*
-`;
-  await writeTextFile(`${paperDir}/notes.md`, notesContent);
-
-  // Create empty annotations.json
-  const annotationsContent = JSON.stringify(
-    {
-      version: 1,
-      highlights: [],
-    },
-    null,
-    2,
-  );
-  await writeTextFile(`${paperDir}/annotations.json`, annotationsContent);
-
-  // Get file size
-  const fileInfo = await stat(pdfPath);
-
-  return {
-    id: folderName,
-    filename,
-    path: paperDir,
-    pdfPath,
-    contentPath,
-    addedAt: new Date(),
-    size: fileInfo.size ? Number(fileInfo.size) : 0,
-    metadata,
-  };
-}
-
-/**
- * Import a PDF file from a source path into the papers directory
- * Creates the full folder structure: {hash}-{year}-{slug}/
- */
-export async function importPDFFromPath(
-  workspacePath: string,
-  sourcePath: string,
-): Promise<Paper> {
-  const papersDir = getPapersDir(workspacePath);
-
-  // Ensure papers directory exists
-  if (!(await pathExists(papersDir))) {
-    await mkdir(papersDir, { recursive: true });
-  }
-
-  return processPaper(papersDir, sourcePath);
-}
-
-/**
- * Parse frontmatter from content.md to extract metadata
- */
-function parseFrontmatter(content: string): Partial<PaperMetadata> {
-  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!frontmatterMatch) {
-    return {};
-  }
-
-  const frontmatter = frontmatterMatch[1];
-  const metadata: Partial<PaperMetadata> = {};
-
-  // Parse title
-  const titleMatch = frontmatter.match(/^title:\s*"(.+)"/m);
-  if (titleMatch) {
-    metadata.title = titleMatch[1];
-  }
-
-  // Parse year
-  const yearMatch = frontmatter.match(/^year:\s*(\d+|null)/m);
-  if (yearMatch && yearMatch[1] !== "null") {
-    metadata.year = parseInt(yearMatch[1], 10);
-  }
-
-  // Parse doi
-  const doiMatch = frontmatter.match(/^doi:\s*"(.+)"/m);
-  if (doiMatch) {
-    metadata.doi = doiMatch[1];
-  }
-
-  // Parse authors (simple approach - look for array items)
-  const authorsMatch = frontmatter.match(/^authors:\n((?:\s+-\s+".+"\n?)+)/m);
-  if (authorsMatch) {
-    const authorLines = authorsMatch[1].match(/-\s+"(.+)"/g);
-    if (authorLines) {
-      metadata.authors = authorLines.map((line) => {
-        const match = line.match(/-\s+"(.+)"/);
-        return match ? match[1] : "";
-      });
-    }
-  }
-
-  // Parse tags
-  const tagsMatch = frontmatter.match(/^tags:\s*\[(.*)\]/m);
-  if (tagsMatch) {
-    const tagsContent = tagsMatch[1];
-    if (tagsContent.trim()) {
-      metadata.tags = tagsContent
-        .split(",")
-        .map((t) => t.trim().replace(/^"|"$/g, ""))
-        .filter((t) => t);
-    }
-  }
-
-  return metadata;
-}
-
-/**
- * Load a paper from its folder path
+ * Load a paper from its folder path by reading meta.json
  */
 export async function loadPaper(paperPath: string): Promise<Paper | null> {
-  const pdfPath = `${paperPath}/index.pdf`;
-  const contentPath = `${paperPath}/content.md`;
+  const metaPath = `${paperPath}/meta.json`;
+  const htmlPath = `${paperPath}/content.html`;
+  const pdfPath = `${paperPath}/source.pdf`;
   const folderName = paperPath.split("/").pop() || paperPath;
 
-  // Check if this is a valid paper folder
-  if (!(await pathExists(pdfPath))) {
+  // Check if meta.json exists (required for a valid paper)
+  if (!(await pathExists(metaPath))) {
     return null;
   }
 
-  // Get PDF info
-  const fileInfo = await stat(pdfPath);
-
-  // Try to read and parse content.md for metadata
-  let metadata: PaperMetadata = {
-    title: folderName,
-    authors: [],
-    year: null,
-    doi: null,
-    abstract: null,
-    tags: [],
-  };
-
+  // Read and parse meta.json
+  let extractedMeta: ExtractedMetadata;
   try {
-    const content = await readTextFile(contentPath);
-    const parsed = parseFrontmatter(content);
-    metadata = {
-      title: parsed.title || folderName,
-      authors: parsed.authors || [],
-      year: parsed.year || null,
-      doi: parsed.doi || null,
-      abstract: parsed.abstract || null,
-      tags: parsed.tags || [],
-    };
+    const metaContent = await readTextFile(metaPath);
+    extractedMeta = JSON.parse(metaContent) as ExtractedMetadata;
   } catch {
-    // No content.md or parsing failed, use defaults
+    return null; // Invalid or unreadable meta.json
   }
 
-  const filename = `${folderName}.pdf`;
+  // Get PDF file info for size and date
+  let fileInfo;
+  try {
+    fileInfo = await stat(pdfPath);
+  } catch {
+    // PDF might not exist, use defaults
+    fileInfo = { size: 0, mtime: null };
+  }
+
+  // Convert ExtractedMetadata to PaperMetadata
+  const metadata: PaperMetadata = {
+    type: extractedMeta.type,
+    title: extractedMeta.title,
+    authors: formatAuthors(extractedMeta.authors),
+    year: extractedMeta.year,
+    doi: extractedMeta.doi,
+    abstract: extractedMeta.abstract,
+    keywords: extractedMeta.keywords,
+  };
 
   return {
     id: folderName,
-    filename,
     path: paperPath,
     pdfPath,
-    contentPath,
+    htmlPath,
     addedAt: fileInfo.mtime ? new Date(fileInfo.mtime) : new Date(),
     size: fileInfo.size ? Number(fileInfo.size) : 0,
     metadata,
@@ -392,60 +126,11 @@ async function loadPaperFromFolder(
   folderName: string,
 ): Promise<Paper | null> {
   const paperDir = `${papersDir}/${folderName}`;
-  const pdfPath = `${paperDir}/index.pdf`;
-  const contentPath = `${paperDir}/content.md`;
-
-  // Check if this is a valid paper folder
-  if (!(await pathExists(pdfPath))) {
-    return null;
-  }
-
-  // Get PDF info
-  const fileInfo = await stat(pdfPath);
-
-  // Try to read and parse content.md for metadata
-  let metadata: PaperMetadata = {
-    title: folderName,
-    authors: [],
-    year: null,
-    doi: null,
-    abstract: null,
-    tags: [],
-  };
-
-  try {
-    const content = await readTextFile(contentPath);
-    const parsed = parseFrontmatter(content);
-    metadata = {
-      title: parsed.title || folderName,
-      authors: parsed.authors || [],
-      year: parsed.year || null,
-      doi: parsed.doi || null,
-      abstract: parsed.abstract || null,
-      tags: parsed.tags || [],
-    };
-  } catch {
-    // No content.md or parsing failed, use defaults
-  }
-
-  // Try to extract original filename from somewhere, or use folder name
-  const filename = `${folderName}.pdf`;
-
-  return {
-    id: folderName,
-    filename,
-    path: paperDir,
-    pdfPath,
-    contentPath,
-    addedAt: fileInfo.mtime ? new Date(fileInfo.mtime) : new Date(),
-    size: fileInfo.size ? Number(fileInfo.size) : 0,
-    metadata,
-  };
+  return loadPaper(paperDir);
 }
 
 /**
  * List all papers in the workspace
- * Reads from the new folder structure: papers/{hash}-{year}-{slug}/
  */
 export async function listPapers(workspacePath: string): Promise<Paper[]> {
   const papersDir = getPapersDir(workspacePath);
@@ -548,8 +233,8 @@ export async function listLibraryItems(
         if (yearB !== yearA) {
           return yearB - yearA;
         }
-        const titleA = (a.paper.metadata.title || a.paper.filename).toLowerCase();
-        const titleB = (b.paper.metadata.title || b.paper.filename).toLowerCase();
+        const titleA = a.paper.metadata.title.toLowerCase();
+        const titleB = b.paper.metadata.title.toLowerCase();
         return titleA.localeCompare(titleB);
       }
 
@@ -558,19 +243,4 @@ export async function listLibraryItems(
   } catch {
     return [];
   }
-}
-
-/**
- * Import a PDF file into a specific directory (not just the root papers dir)
- */
-export async function importPDFToDirectory(
-  targetDirectory: string,
-  sourcePath: string,
-): Promise<Paper> {
-  // Ensure target directory exists
-  if (!(await pathExists(targetDirectory))) {
-    await mkdir(targetDirectory, { recursive: true });
-  }
-
-  return processPaper(targetDirectory, sourcePath);
 }

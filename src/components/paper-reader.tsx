@@ -1,10 +1,5 @@
 import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor } from "@/components/notes-editor";
-import {
-  parseFrontmatter,
-  renderMarkdownBodyCached,
-  type ParsedFrontmatter,
-} from "@/lib/markdown";
 import type { Paper } from "@/lib/papers";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,7 +14,6 @@ const AUTO_SAVE_DELAY = 1500;
 
 export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [html, setHtml] = useState<string>("");
-  const [frontmatter, setFrontmatter] = useState<ParsedFrontmatter>({});
   const [initialNotes, setInitialNotes] = useState<string | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
@@ -35,44 +29,25 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   // Ref to track current notes value (not state to avoid re-renders)
   const currentNotesRef = useRef<string>("");
 
-  // Load and render content.md
+  // Load content.html directly
   useEffect(() => {
-    async function loadAndRenderContent() {
+    async function loadContent() {
       setIsLoadingContent(true);
+      setError(null);
       try {
-        // Read the markdown file
-        console.time("readTextFile");
-        const markdown = await readTextFile(paper.contentPath);
-        console.timeEnd("readTextFile");
-
-        // Parse frontmatter (synchronous, fast)
-        const fm = parseFrontmatter(markdown);
-        setFrontmatter(fm);
-
-        // Render markdown to HTML (with caching)
-        const result = await renderMarkdownBodyCached(
-          markdown,
-          paper.contentPath,
-        );
-        setHtml(result.html);
-
-        // Log performance info
-        if (result.fromCache) {
-          console.debug("[PaperReader] Cache HIT");
-        } else {
-          console.debug(
-            `[PaperReader] Cache MISS - rendered in ${result.renderTimeMs?.toFixed(2)}ms`,
-          );
-        }
+        const htmlContent = await readTextFile(paper.htmlPath);
+        setHtml(htmlContent);
       } catch (err) {
         console.error("Failed to load content:", err);
-        setError("Failed to load paper content");
+        setError(
+          "Content not available. The paper may not have been fully processed.",
+        );
       } finally {
         setIsLoadingContent(false);
       }
     }
-    loadAndRenderContent();
-  }, [paper.contentPath]);
+    loadContent();
+  }, [paper.htmlPath]);
 
   // Load notes.md
   useEffect(() => {
@@ -83,9 +58,8 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         const text = await readTextFile(notesPath);
         setInitialNotes(text);
         currentNotesRef.current = text;
-      } catch (err) {
+      } catch {
         // Notes file might not exist yet
-        console.warn("Notes file not found, starting with empty:", err);
         const defaultNotes = `# Notes: ${paper.metadata.title}\n\n*Add your notes about this paper here.*\n`;
         setInitialNotes(defaultNotes);
         currentNotesRef.current = defaultNotes;
@@ -220,8 +194,8 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
           >
             <ArticleViewer
               html={html}
-              title={frontmatter.title}
-              authors={frontmatter.authors}
+              title={paper.metadata.title}
+              authors={paper.metadata.authors}
               className="pb-32 px-6"
             />
           </div>

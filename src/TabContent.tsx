@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { PaperLibrary } from "@/components/paper-library";
 import { PaperReader } from "@/components/paper-reader";
-import { useWorkspace } from "@/hooks/use-workspace";
 import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useWorkspace } from "@/hooks/use-workspace";
 import type { Paper } from "@/lib/papers";
 import { loadPaper } from "@/lib/papers";
+import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * TabContent is rendered inside each child webview.
@@ -22,9 +22,13 @@ export function TabContent() {
   useTabKeyboardShortcuts();
 
   // SPA state for in-tab navigation
-  const [view, setView] = useState<"home" | "paper">(initialTabType as "home" | "paper");
+  const [view, setView] = useState<"home" | "paper">(
+    initialTabType as "home" | "paper",
+  );
   const [currentPaper, setCurrentPaper] = useState<Paper | null>(null);
-  const [isPaperLoading, setIsPaperLoading] = useState(initialTabType === "paper" && !!paperPath);
+  const [isPaperLoading, setIsPaperLoading] = useState(
+    initialTabType === "paper" && !!paperPath,
+  );
 
   // Load paper data when this is a paper tab (initial load from URL)
   useEffect(() => {
@@ -36,7 +40,7 @@ export function TabContent() {
             setCurrentPaper(loadedPaper);
             setView("paper");
             // Update tab title with paper name
-            const title = loadedPaper.metadata.title || loadedPaper.filename;
+            const title = loadedPaper.metadata.title || loadedPaper.id;
             invoke("update_current_tab_title", { title });
           } else {
             // Paper not found, fall back to home view
@@ -62,7 +66,7 @@ export function TabContent() {
     async (selectedPaper: Paper, openInNewTab: boolean) => {
       if (openInNewTab) {
         // Create a new tab via Rust
-        const title = selectedPaper.metadata.title || selectedPaper.filename;
+        const title = selectedPaper.metadata.title || selectedPaper.id;
         await invoke("create_tab", {
           tabType: "paper",
           paperPath: selectedPaper.path,
@@ -73,11 +77,11 @@ export function TabContent() {
         setCurrentPaper(selectedPaper);
         setView("paper");
         // Update tab title with paper name
-        const title = selectedPaper.metadata.title || selectedPaper.filename;
+        const title = selectedPaper.metadata.title || selectedPaper.id;
         await invoke("update_current_tab_title", { title });
       }
     },
-    []
+    [],
   );
 
   // Handle back navigation from paper reader (SPA navigation)

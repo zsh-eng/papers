@@ -25,7 +25,6 @@ export { getGeminiClient, EXTRACTION_MODEL } from "./client";
 export type {
   DocumentType,
   ExtractedMetadata,
-  ExtractedContent,
   Figure,
   BoundingBox,
   MetadataOptions,
@@ -34,7 +33,6 @@ export type {
 
 export {
   metadataResponseSchema,
-  contentResponseSchema,
   figureSchema,
   documentTypeSchema,
 } from "./schemas";

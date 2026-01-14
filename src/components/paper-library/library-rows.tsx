@@ -93,7 +93,7 @@ export function PaperRow({
   onHover,
 }: PaperRowProps) {
   const { metadata } = paper;
-  const displayTitle = metadata.title || paper.filename;
+  const displayTitle = metadata.title || paper.id;
   const displayAuthors =
     metadata.authors.length > 0
       ? metadata.authors.length > 2

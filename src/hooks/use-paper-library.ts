@@ -1,10 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
-import {
-  getPapersDir,
-  listLibraryItems,
-  importPDFToDirectory,
-  type LibraryItem,
-} from "@/lib/papers";
+import { useQueryClient } from "@tanstack/react-query";
+import { getPapersDir, type LibraryItem } from "@/lib/papers";
+import { useLibraryItemsQuery } from "@/hooks/use-papers-query";
 import { createFolder, deleteItem, pathExists } from "@/lib/fs";
 import { mkdir } from "@tauri-apps/plugin-fs";
 
@@ -22,77 +19,61 @@ export interface UsePaperLibraryReturn {
 
   // Navigation
   breadcrumbs: Breadcrumb[];
-  navigateTo: (path: string) => Promise<void>;
-  navigateUp: () => Promise<void>;
+  navigateTo: (path: string) => void;
+  navigateUp: () => void;
   canNavigateUp: boolean;
 
   // Actions
-  importFromPaths: (paths: string[]) => Promise<void>;
   createNewFolder: (name: string) => Promise<void>;
   deleteLibraryItem: (path: string) => Promise<void>;
-  refresh: () => Promise<void>;
+  refresh: () => void;
 }
 
 export function usePaperLibrary(
   workspacePath: string | null,
 ): UsePaperLibraryReturn {
+  const queryClient = useQueryClient();
   const papersDir = workspacePath ? getPapersDir(workspacePath) : null;
 
   const [currentPath, setCurrentPath] = useState<string | null>(null);
-  const [items, setItems] = useState<LibraryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Initialize currentPath to papersDir when it becomes available
   const effectiveCurrentPath = currentPath ?? papersDir;
 
-  /**
-   * Load items from a directory
-   */
-  const loadDirectory = useCallback(async (dirPath: string) => {
-    setIsLoading(true);
-    setError(null);
+  // Use TanStack Query for fetching library items
+  const {
+    data: items = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useLibraryItemsQuery(effectiveCurrentPath);
 
-    try {
-      // Ensure directory exists
-      if (!(await pathExists(dirPath))) {
-        await mkdir(dirPath, { recursive: true });
-      }
-
-      const libraryItems = await listLibraryItems(dirPath);
-      setItems(libraryItems);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load directory");
-      setItems([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // Combine query error with action error
+  const error =
+    actionError || (queryError instanceof Error ? queryError.message : null);
 
   /**
    * Navigate to a specific directory
    */
-  const navigateTo = useCallback(
-    async (path: string) => {
-      setCurrentPath(path);
-      await loadDirectory(path);
-    },
-    [loadDirectory],
-  );
+  const navigateTo = useCallback((path: string) => {
+    setCurrentPath(path);
+    setActionError(null);
+  }, []);
 
   /**
    * Navigate up one level (but not above papersDir)
    */
-  const navigateUp = useCallback(async () => {
+  const navigateUp = useCallback(() => {
     if (!effectiveCurrentPath || !papersDir) return;
     if (effectiveCurrentPath === papersDir) return;
 
     const parentPath = effectiveCurrentPath.split("/").slice(0, -1).join("/");
     if (parentPath.length >= papersDir.length) {
       setCurrentPath(parentPath);
-      await loadDirectory(parentPath);
+      setActionError(null);
     }
-  }, [effectiveCurrentPath, papersDir, loadDirectory]);
+  }, [effectiveCurrentPath, papersDir]);
 
   /**
    * Check if we can navigate up
@@ -125,54 +106,31 @@ export function usePaperLibrary(
   }, [effectiveCurrentPath, papersDir]);
 
   /**
-   * Import PDFs into the current directory
-   */
-  const importFromPaths = useCallback(
-    async (paths: string[]) => {
-      if (!effectiveCurrentPath) return;
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        for (const sourcePath of paths) {
-          await importPDFToDirectory(effectiveCurrentPath, sourcePath);
-        }
-        // Refresh the view
-        await loadDirectory(effectiveCurrentPath);
-      } catch (err) {
-        console.error(err);
-        setError(
-          err instanceof Error ? err.message : "Failed to import papers",
-        );
-        // Still refresh to show any that succeeded
-        await loadDirectory(effectiveCurrentPath);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [effectiveCurrentPath, loadDirectory],
-  );
-
-  /**
    * Create a new folder in the current directory
    */
   const createNewFolder = useCallback(
     async (name: string) => {
       if (!effectiveCurrentPath) return;
 
-      setError(null);
+      setActionError(null);
 
       try {
+        // Ensure directory exists
+        if (!(await pathExists(effectiveCurrentPath))) {
+          await mkdir(effectiveCurrentPath, { recursive: true });
+        }
         await createFolder(effectiveCurrentPath, name);
-        await loadDirectory(effectiveCurrentPath);
+        // Invalidate the query to refetch
+        queryClient.invalidateQueries({
+          queryKey: ["libraryItems", effectiveCurrentPath],
+        });
       } catch (err) {
-        setError(
+        setActionError(
           err instanceof Error ? err.message : "Failed to create folder",
         );
       }
     },
-    [effectiveCurrentPath, loadDirectory],
+    [effectiveCurrentPath, queryClient],
   );
 
   /**
@@ -182,29 +140,34 @@ export function usePaperLibrary(
     async (path: string) => {
       if (!effectiveCurrentPath) return;
 
-      setError(null);
+      setActionError(null);
 
       try {
         await deleteItem(path);
-        await loadDirectory(effectiveCurrentPath);
+        // Invalidate the query to refetch
+        queryClient.invalidateQueries({
+          queryKey: ["libraryItems", effectiveCurrentPath],
+        });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to delete item");
+        setActionError(
+          err instanceof Error ? err.message : "Failed to delete item",
+        );
       }
     },
-    [effectiveCurrentPath, loadDirectory],
+    [effectiveCurrentPath, queryClient],
   );
 
   /**
    * Refresh the current view
    */
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(() => {
     if (effectiveCurrentPath) {
-      await loadDirectory(effectiveCurrentPath);
+      queryClient.invalidateQueries({
+        queryKey: ["libraryItems", effectiveCurrentPath],
+      });
+      refetch();
     }
-  }, [effectiveCurrentPath, loadDirectory]);
-
-  // Initial load when papersDir becomes available
-  // This is handled by the component using useEffect
+  }, [effectiveCurrentPath, queryClient, refetch]);
 
   return {
     currentPath: effectiveCurrentPath || "",
@@ -215,7 +178,6 @@ export function usePaperLibrary(
     navigateTo,
     navigateUp,
     canNavigateUp,
-    importFromPaths,
     createNewFolder,
     deleteLibraryItem,
     refresh,

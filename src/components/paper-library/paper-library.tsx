@@ -7,8 +7,6 @@ import {
 import { useDarkMode } from "@/hooks/use-dark-mode";
 import { usePaperLibrary } from "@/hooks/use-paper-library";
 import type { Paper } from "@/lib/papers";
-import { cn } from "@/lib/utils";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useState } from "react";
 import { LibraryBreadcrumb } from "./library-breadcrumb";
 import { CreateFolderDialog, DeleteConfirmDialog } from "./library-dialogs";
@@ -30,13 +28,11 @@ export function PaperLibrary({
     error,
     breadcrumbs,
     navigateTo,
-    importFromPaths,
     createNewFolder,
     deleteLibraryItem,
     refresh,
   } = usePaperLibrary(workspacePath);
 
-  const [isDragOver, setIsDragOver] = useState(false);
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const { isDark, toggle } = useDarkMode();
 
@@ -54,40 +50,6 @@ export function PaperLibrary({
       refresh();
     }
   }, [currentPath, refresh]);
-
-  // Full-page drag and drop
-  useEffect(() => {
-    const webview = getCurrentWebview();
-
-    const setupListener = async () => {
-      const unlisten = await webview.onDragDropEvent((event) => {
-        if (event.payload.type === "enter" || event.payload.type === "over") {
-          setIsDragOver(true);
-        } else if (event.payload.type === "drop") {
-          setIsDragOver(false);
-
-          const paths = event.payload.paths.filter((path) => {
-            const ext = `.${path.split(".").pop()?.toLowerCase()}`;
-            return ext === ".pdf";
-          });
-
-          if (paths.length > 0) {
-            importFromPaths(paths);
-          }
-        } else if (event.payload.type === "leave") {
-          setIsDragOver(false);
-        }
-      });
-
-      return unlisten;
-    };
-
-    const unlistenPromise = setupListener();
-
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-    };
-  }, [importFromPaths]);
 
   // Handle delete confirmation
   const handleDeleteConfirm = () => {
@@ -107,12 +69,7 @@ export function PaperLibrary({
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger
-        className={cn(
-          "h-screen flex flex-col transition-colors",
-          isDragOver && "bg-muted/30",
-        )}
-      >
+      <ContextMenuTrigger className="h-screen flex flex-col">
         {/* Main content - centered */}
         <main className="flex-1 overflow-auto pt-[calc(var(--titlebar-height)+3rem)]">
           <div className="max-w-4xl mx-auto px-8">
@@ -202,8 +159,7 @@ export function PaperLibrary({
                               setItemToDelete({
                                 path: item.paper.path,
                                 name:
-                                  item.paper.metadata.title ||
-                                  item.paper.filename,
+                                  item.paper.metadata.title || item.paper.id,
                               });
                               setDeleteDialogOpen(true);
                             }}
@@ -219,15 +175,6 @@ export function PaperLibrary({
               )}
             </div>
           </div>
-
-          {/* Drag overlay hint */}
-          {isDragOver && (
-            <div className="fixed inset-0 flex items-center justify-center pointer-events-none">
-              <p className="font-mono text-sm tracking-wide text-muted-foreground">
-                Drop to add
-              </p>
-            </div>
-          )}
         </main>
       </ContextMenuTrigger>
       <ContextMenuContent>
