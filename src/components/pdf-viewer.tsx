@@ -22,8 +22,11 @@ interface PdfViewerProps {
   scrollContainerRef?: RefObject<HTMLDivElement | null>;
 }
 
-const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3];
-const DEFAULT_ZOOM_INDEX = 2; // 100%
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4;
+const DEFAULT_ZOOM = 1;
+const KEYBOARD_ZOOM_STEP = 0.25;
+const RENDER_DEBOUNCE_MS = 150;
 
 export function PdfViewer({
   pdfPath,
@@ -33,15 +36,21 @@ export function PdfViewer({
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
+  const [scale, setScale] = useState(DEFAULT_ZOOM);
+  // renderScale is the scale at which canvases are actually rendered
+  // We use CSS transform for smooth zooming, then re-render when zooming stops
+  const [renderScale, setRenderScale] = useState(DEFAULT_ZOOM);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   const renderingRef = useRef<Set<number>>(new Set());
-
-  const scale = ZOOM_LEVELS[zoomIndex];
+  const renderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Store base dimensions (at scale=1) for each page to calculate CSS-transformed sizes
+  const [pageDimensions, setPageDimensions] = useState<
+    Map<number, { width: number; height: number }>
+  >(new Map());
 
   // Load PDF document
   useEffect(() => {
@@ -81,7 +90,7 @@ export function PdfViewer({
     };
   }, [pdfPath]);
 
-  // Render a single page to canvas
+  // Render a single page to canvas at the current renderScale
   const renderPage = useCallback(
     async (pageNum: number, canvas: HTMLCanvasElement) => {
       if (!pdf || renderingRef.current.has(pageNum)) return;
@@ -90,10 +99,21 @@ export function PdfViewer({
 
       try {
         const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale });
+        const viewport = page.getViewport({ scale: renderScale });
 
         canvas.height = viewport.height;
         canvas.width = viewport.width;
+
+        // Store base dimensions (at scale=1) for layout calculations
+        const baseViewport = page.getViewport({ scale: 1 });
+        setPageDimensions((prev) => {
+          const next = new Map(prev);
+          next.set(pageNum, {
+            width: baseViewport.width,
+            height: baseViewport.height,
+          });
+          return next;
+        });
 
         const context = canvas.getContext("2d");
         if (!context) return;
@@ -109,17 +129,37 @@ export function PdfViewer({
         renderingRef.current.delete(pageNum);
       }
     },
-    [pdf, scale],
+    [pdf, renderScale],
   );
 
-  // Re-render all visible pages when scale changes
+  // Debounce render scale updates for smooth zooming
+  useEffect(() => {
+    if (renderDebounceRef.current) {
+      clearTimeout(renderDebounceRef.current);
+    }
+
+    renderDebounceRef.current = setTimeout(() => {
+      setRenderScale(scale);
+    }, RENDER_DEBOUNCE_MS);
+
+    return () => {
+      if (renderDebounceRef.current) {
+        clearTimeout(renderDebounceRef.current);
+      }
+    };
+  }, [scale]);
+
+  // Re-render all pages when renderScale changes
   useEffect(() => {
     if (!pdf) return;
 
     canvasRefs.current.forEach((canvas, pageNum) => {
       renderPage(pageNum, canvas);
     });
-  }, [pdf, scale, renderPage]);
+  }, [pdf, renderScale, renderPage]);
+
+  // CSS transform ratio for smooth zooming
+  const cssScale = scale / renderScale;
 
   // Track current page based on scroll position
   useEffect(() => {
@@ -176,11 +216,15 @@ export function PdfViewer({
   }, [currentPage, numPages, scrollToPage]);
 
   const zoomIn = useCallback(() => {
-    setZoomIndex((i) => Math.min(i + 1, ZOOM_LEVELS.length - 1));
+    setScale((s) => Math.min(s + KEYBOARD_ZOOM_STEP, MAX_ZOOM));
   }, []);
 
   const zoomOut = useCallback(() => {
-    setZoomIndex((i) => Math.max(i - 1, 0));
+    setScale((s) => Math.max(s - KEYBOARD_ZOOM_STEP, MIN_ZOOM));
+  }, []);
+
+  const adjustZoom = useCallback((delta: number) => {
+    setScale((s) => Math.min(Math.max(s + delta, MIN_ZOOM), MAX_ZOOM));
   }, []);
 
   // Keyboard navigation
@@ -201,7 +245,7 @@ export function PdfViewer({
       } else if (e.key === "ArrowRight" || e.key === "PageDown") {
         e.preventDefault();
         goToNextPage();
-      } else if ((e.metaKey || e.ctrlKey) && e.key === "=") {
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
         e.preventDefault();
         zoomIn();
       } else if ((e.metaKey || e.ctrlKey) && e.key === "-") {
@@ -213,6 +257,26 @@ export function PdfViewer({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goToPrevPage, goToNextPage, zoomIn, zoomOut]);
+
+  // Pinch-to-zoom via trackpad (wheel events with ctrlKey)
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef?.current || containerRef.current;
+    if (!scrollContainer) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Pinch-to-zoom on macOS sends wheel events with ctrlKey
+      if (e.ctrlKey) {
+        e.preventDefault();
+        // Scale the delta for smooth zooming - negative deltaY = zoom in
+        const zoomSensitivity = 0.01;
+        const delta = -e.deltaY * zoomSensitivity;
+        adjustZoom(delta);
+      }
+    };
+
+    scrollContainer.addEventListener("wheel", handleWheel, { passive: false });
+    return () => scrollContainer.removeEventListener("wheel", handleWheel);
+  }, [scrollContainerRef, adjustZoom, isLoading]);
 
   if (isLoading) {
     return (
@@ -271,7 +335,7 @@ export function PdfViewer({
         <div className="flex items-center gap-1">
           <button
             onClick={zoomOut}
-            disabled={zoomIndex <= 0}
+            disabled={scale <= MIN_ZOOM}
             className="p-1 rounded hover:bg-muted-foreground/10 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Zoom out"
           >
@@ -282,7 +346,7 @@ export function PdfViewer({
           </span>
           <button
             onClick={zoomIn}
-            disabled={zoomIndex >= ZOOM_LEVELS.length - 1}
+            disabled={scale >= MAX_ZOOM}
             className="p-1 rounded hover:bg-muted-foreground/10 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Zoom in"
           >
@@ -294,20 +358,37 @@ export function PdfViewer({
       {/* PDF pages container - scrollable both directions */}
       <div ref={containerRef} className="flex-1 overflow-auto bg-muted/20">
         <div className="flex flex-col items-center gap-4 p-4 min-w-fit">
-          {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-            <canvas
-              key={pageNum}
-              ref={(el) => {
-                if (el) {
-                  canvasRefs.current.set(pageNum, el);
-                  renderPage(pageNum, el);
-                } else {
-                  canvasRefs.current.delete(pageNum);
-                }
-              }}
-              className="shadow-lg bg-white"
-            />
-          ))}
+          {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => {
+            const baseDims = pageDimensions.get(pageNum);
+            return (
+              <div
+                key={pageNum}
+                className="flex items-center justify-center shrink-0"
+                style={{
+                  // Reserve space based on target scale using base dimensions
+                  // This prevents layout shifts during CSS transform zooming
+                  width: baseDims ? baseDims.width * scale : undefined,
+                  height: baseDims ? baseDims.height * scale : undefined,
+                }}
+              >
+                <canvas
+                  ref={(el) => {
+                    if (el) {
+                      canvasRefs.current.set(pageNum, el);
+                      renderPage(pageNum, el);
+                    } else {
+                      canvasRefs.current.delete(pageNum);
+                    }
+                  }}
+                  className="shadow-lg bg-white"
+                  style={{
+                    transform: `scale(${cssScale})`,
+                    transformOrigin: "center center",
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

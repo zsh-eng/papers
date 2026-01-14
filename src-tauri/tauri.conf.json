@@ -26,7 +26,8 @@
         "fullscreen": false,
         "maximized": true,
         "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "hiddenTitle": true,
+        "zoomHotkeysEnabled": false
       }
     ]
   },
