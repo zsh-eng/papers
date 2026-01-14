@@ -206,7 +206,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         <>
           {/* Article/PDF view with its own scroll container */}
           <div
-            className="fixed top-[var(--titlebar-height)] bottom-0 left-0 overflow-auto"
+            className="fixed top-0 bottom-0 left-0 overflow-auto"
             style={{
               right: notesOpen ? "40%" : 0,
               paddingTop: viewMode === "md" ? "3rem" : "0",
@@ -217,7 +217,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
                 html={html}
                 title={paper.metadata.title}
                 authors={paper.metadata.authors}
-                className="pb-32 px-6"
+                className="pb-32 px-6 paper-scroll-container"
               />
             ) : (
               <PdfViewer pdfPath={paper.pdfPath} className="h-full" />
@@ -226,7 +226,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
 
           {/* Notes sidebar with its own scroll container */}
           {notesOpen && initialNotes !== null && (
-            <div className="fixed top-[var(--titlebar-height)] right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col">
+            <div className="fixed top-0 right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col">
               <NotesEditor
                 value={initialNotes}
                 onChange={handleNotesChange}

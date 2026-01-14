@@ -61,8 +61,6 @@ const obsidianTheme = EditorView.theme({
     borderLeftColor: "var(--foreground)",
   },
 
-
-
   // Headings - bold, sized, NO underline
   ".cm-heading": {
     fontWeight: "700",
