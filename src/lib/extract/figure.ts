@@ -100,6 +100,8 @@ export function extractFigure(
   const cmd = [
     "pdftocairo",
     formatFlag,
+    // To avoid the page number in the suffix
+    `-singlefile`,
     `-r ${dpi}`,
     `-f ${pageNum}`,
     `-l ${pageNum}`,
@@ -113,9 +115,8 @@ export function extractFigure(
 
   execSync(cmd, { stdio: "pipe" });
 
-  // pdftocairo adds page number suffix for single-page output
   const ext = format === "jpeg" ? "jpg" : "png";
-  return `${outBase}-${pageNum}.${ext}`;
+  return `${outBase}.${ext}`;
 }
 
 /**

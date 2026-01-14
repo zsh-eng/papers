@@ -61,7 +61,7 @@ function slugify(text: string): string {
  *   { title: "Attention Is All You Need", year: 2017 } -> "2017-attention-is-all-you-need"
  *   { title: "CS4223 L3: Cache Coherence" } -> "cs4223-l3-cache-coherence"
  */
-function generateFolderName(title: string, year?: number): string {
+function generateFolderName(title: string, year?: number | null): string {
   const slug = slugify(title);
   return year ? `${year}-${slug}` : slug;
 }
