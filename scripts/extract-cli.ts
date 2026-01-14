@@ -6,6 +6,7 @@
  * For example, processing "Attention Is All You Need" (2017) creates:
  *   papers/2017-attention-is-all-you-need/
  *     ├── meta.json
+ *     ├── source.pdf
  *     ├── content.md
  *     └── content.html
  *
@@ -27,7 +28,7 @@
  */
 
 import { existsSync } from "fs";
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
 import { extractContent } from "../src/lib/extract/content";
 import {
@@ -127,6 +128,7 @@ ${colors.cyan}Examples:${colors.reset}
 ${colors.cyan}Output Structure:${colors.reset}
   {year}-{title-slug}/
     ├── meta.json       Bibliographic metadata + figure bounding boxes
+    ├── source.pdf      Original PDF file
     ├── content.md      Markdown source
     ├── content.html    Pre-rendered HTML (ready for viewing)
     └── figures/        Extracted figure images (if any)
@@ -179,6 +181,7 @@ function getOutputPaths(paperDir: string) {
   return {
     dir: paperDir,
     metadataJson: join(paperDir, "meta.json"),
+    sourcePdf: join(paperDir, "source.pdf"),
     markdown: join(paperDir, "content.md"),
     html: join(paperDir, "content.html"),
   };
@@ -214,6 +217,10 @@ async function runMetadata(
   }
 
   const paths = getOutputPaths(paperDir);
+
+  // Copy PDF to output directory as source.pdf
+  await copyFile(pdfPath, paths.sourcePdf);
+
   await writeFile(paths.metadataJson, JSON.stringify(metadata, null, 2));
 
   // Format authors for display
@@ -329,11 +336,7 @@ async function runFigures(
  * Run the full extraction pipeline.
  * Creates a folder named {year}-{title-slug} inside the output directory.
  */
-async function runFull(
-  pdfPath: string,
-  baseDir: string,
-  context?: string,
-) {
+async function runFull(pdfPath: string, baseDir: string, context?: string) {
   // Ensure base directory exists (if specified)
   if (baseDir && !existsSync(baseDir)) {
     await mkdir(baseDir, { recursive: true });
@@ -392,14 +395,20 @@ async function main() {
         // Content requires a paper folder with meta.json
         // The folder was created by the 'metadata' command
         if (!outputDir) {
-          error(`Content command requires --output-dir pointing to the paper folder.`);
-          error(`Run 'metadata' first to create the folder, or use 'full' for the complete pipeline.`);
+          error(
+            `Content command requires --output-dir pointing to the paper folder.`,
+          );
+          error(
+            `Run 'metadata' first to create the folder, or use 'full' for the complete pipeline.`,
+          );
           process.exit(1);
         }
         const paths = getOutputPaths(outputDir);
         if (!existsSync(paths.metadataJson)) {
           error(`Metadata file not found: ${paths.metadataJson}`);
-          error(`Run 'metadata' command first, or use 'full' for the complete pipeline.`);
+          error(
+            `Run 'metadata' command first, or use 'full' for the complete pipeline.`,
+          );
           process.exit(1);
         }
         const metadataRaw = await readFile(paths.metadataJson, "utf-8");
@@ -410,14 +419,20 @@ async function main() {
       case "figures": {
         // Figures requires a paper folder with meta.json
         if (!outputDir) {
-          error(`Figures command requires --output-dir pointing to the paper folder.`);
-          error(`Run 'metadata' first to create the folder, or use 'full' for the complete pipeline.`);
+          error(
+            `Figures command requires --output-dir pointing to the paper folder.`,
+          );
+          error(
+            `Run 'metadata' first to create the folder, or use 'full' for the complete pipeline.`,
+          );
           process.exit(1);
         }
         const figPaths = getOutputPaths(outputDir);
         if (!existsSync(figPaths.metadataJson)) {
           error(`Metadata file not found: ${figPaths.metadataJson}`);
-          error(`Run 'metadata' command first, or use 'full' for the complete pipeline.`);
+          error(
+            `Run 'metadata' command first, or use 'full' for the complete pipeline.`,
+          );
           process.exit(1);
         }
         const figMetadataRaw = await readFile(figPaths.metadataJson, "utf-8");
