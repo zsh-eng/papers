@@ -2,6 +2,7 @@ import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor } from "@/components/notes-editor";
 import type { Paper } from "@/lib/papers";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { transformImageSources } from "@/lib/html";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface PaperReaderProps {
@@ -36,7 +37,12 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       setError(null);
       try {
         const htmlContent = await readTextFile(paper.htmlPath);
-        setHtml(htmlContent);
+        const transformedHtml = transformImageSources(htmlContent, paper.path);
+        console.log(
+          "Setting HTML, first img src:",
+          transformedHtml.match(/src="([^"]+)"/)?.[1],
+        );
+        setHtml(transformedHtml);
       } catch (err) {
         console.error("Failed to load content:", err);
         setError(
