@@ -2,21 +2,27 @@
 /**
  * CLI tool for PDF extraction.
  *
+ * Automatically creates a folder named {year}-{title-slug} for each paper.
+ * For example, processing "Attention Is All You Need" (2017) creates:
+ *   papers/2017-attention-is-all-you-need/
+ *     ├── meta.json
+ *     ├── content.md
+ *     └── content.html
+ *
  * Usage:
  *   bun run scripts/extract-cli.ts metadata <pdf>     # Extract metadata + figures
  *   bun run scripts/extract-cli.ts content <pdf>      # Extract content + render HTML
- *   bun run scripts/extract-cli.ts full <pdf>         # Run full pipeline
+ *   bun run scripts/extract-cli.ts full <pdf>         # Run full pipeline (recommended)
  *
  * Options:
- *   --output-dir, -o <dir>   Output directory (default: same as PDF)
+ *   --output-dir, -o <dir>   Parent directory for paper folder (default: same as PDF)
  *   --context, -c <text>     Additional context (citation, course info, etc.)
  *   --help, -h               Show help
  *
  * Examples:
- *   bun run scripts/extract-cli.ts metadata paper.pdf
- *   bun run scripts/extract-cli.ts content paper.pdf
- *   bun run scripts/extract-cli.ts full paper.pdf -o ./output
- *   bun run scripts/extract-cli.ts full chapter.pdf --context "Smith, J. (2020). Chapter 3. In Book Title."
+ *   bun run scripts/extract-cli.ts full paper.pdf -o ~/papers
+ *   bun run scripts/extract-cli.ts full paper.pdf -o ~/papers/ml
+ *   bun run scripts/extract-cli.ts full chapter.pdf -o ~/papers -c "Smith (2020). Chapter 3."
  */
 
 import { existsSync } from "fs";
@@ -26,6 +32,33 @@ import { extractContent } from "../src/lib/extract/content";
 import { extractMetadata } from "../src/lib/extract/metadata";
 import { renderToHtmlDocument } from "../src/lib/extract/render";
 import type { ExtractedMetadata } from "../src/lib/extract/types";
+
+/**
+ * Convert a string to a URL/folder-safe slug.
+ * Examples:
+ *   "Attention Is All You Need" -> "attention-is-all-you-need"
+ *   "CS4223: Cache Coherence" -> "cs4223-cache-coherence"
+ */
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/['']/g, "") // Remove apostrophes
+    .replace(/[^a-z0-9]+/g, "-") // Replace non-alphanumeric with hyphens
+    .replace(/^-+|-+$/g, "") // Trim leading/trailing hyphens
+    .replace(/-+/g, "-"); // Collapse multiple hyphens
+}
+
+/**
+ * Generate a folder name from metadata.
+ * Format: {year}-{slug} or just {slug} if no year.
+ * Examples:
+ *   { title: "Attention Is All You Need", year: 2017 } -> "2017-attention-is-all-you-need"
+ *   { title: "CS4223 L3: Cache Coherence" } -> "cs4223-l3-cache-coherence"
+ */
+function generateFolderName(title: string, year?: number): string {
+  const slug = slugify(title);
+  return year ? `${year}-${slug}` : slug;
+}
 
 // ANSI colors for terminal output
 const colors = {
@@ -59,29 +92,37 @@ function printHelp() {
   console.log(`
 ${colors.bright}PDF Extraction CLI${colors.reset}
 
+Automatically creates a folder named {year}-{title-slug} for each paper.
+
 ${colors.cyan}Usage:${colors.reset}
   bun run scripts/extract-cli.ts <command> <pdf> [options]
 
 ${colors.cyan}Commands:${colors.reset}
-  metadata <pdf>    Extract metadata + figure bounding boxes (~5-15 seconds)
-  content <pdf>     Extract content as markdown, render HTML (~30-200 seconds)
-  full <pdf>        Run full pipeline (metadata + content + HTML)
+  full <pdf>        Run full pipeline (recommended)
+  metadata <pdf>    Extract metadata only (~5-15 seconds)
+  content <pdf>     Extract content only (requires metadata first)
 
 ${colors.cyan}Options:${colors.reset}
-  --output-dir, -o <dir>   Output directory (default: same as PDF)
-  --context, -c <text>     Additional context for extraction (citation, course info, etc.)
+  --output-dir, -o <dir>   Parent directory for paper folder (default: same as PDF)
+  --context, -c <text>     Additional context (citation, course info, etc.)
   --help, -h               Show this help message
 
 ${colors.cyan}Examples:${colors.reset}
-  bun run scripts/extract-cli.ts metadata paper.pdf
-  bun run scripts/extract-cli.ts content paper.pdf
-  bun run scripts/extract-cli.ts full paper.pdf -o ./output
-  bun run scripts/extract-cli.ts full chapter.pdf -c "Smith, J. (2020). Chapter 3. In Book Title (pp. 45-67). Publisher."
+  # Process a paper into ~/papers/2017-attention-is-all-you-need/
+  bun run scripts/extract-cli.ts full attention.pdf -o ~/papers
 
-${colors.cyan}Output Files:${colors.reset}
-  meta.json       Bibliographic metadata + figure bounding boxes
-  content.md      Markdown source
-  content.html    Pre-rendered HTML (ready for viewing)
+  # Organize by topic: ~/papers/ml/2017-attention-is-all-you-need/
+  bun run scripts/extract-cli.ts full attention.pdf -o ~/papers/ml
+
+  # With citation context for book chapters
+  bun run scripts/extract-cli.ts full chapter.pdf -o ~/papers \\
+    -c "Smith, J. (2020). Chapter 3. In Book Title (pp. 45-67). Publisher."
+
+${colors.cyan}Output Structure:${colors.reset}
+  {year}-{title-slug}/
+    ├── meta.json       Bibliographic metadata + figure bounding boxes
+    ├── content.md      Markdown source
+    └── content.html    Pre-rendered HTML (ready for viewing)
 
 ${colors.cyan}Environment:${colors.reset}
   GEMINI_API_KEY    Required. Get your key at https://aistudio.google.com/apikey
@@ -121,23 +162,28 @@ function parseArgs(args: string[]): {
   return { command, pdfPath, outputDir, context };
 }
 
-function getOutputPaths(pdfPath: string, outputDir: string) {
-  const dir = outputDir || dirname(pdfPath);
-  const base = basename(pdfPath, ".pdf");
-
+/**
+ * Get output file paths for a paper folder.
+ * Files use simple names since they're in their own folder.
+ */
+function getOutputPaths(paperDir: string) {
   return {
-    dir,
-    metadataJson: join(dir, `${base}.meta.json`),
-    markdown: join(dir, `${base}.md`),
-    html: join(dir, `${base}.html`),
+    dir: paperDir,
+    metadataJson: join(paperDir, "meta.json"),
+    markdown: join(paperDir, "content.md"),
+    html: join(paperDir, "content.html"),
   };
 }
 
+/**
+ * Extract metadata and create the paper folder.
+ * Returns metadata and the path to the created paper folder.
+ */
 async function runMetadata(
   pdfPath: string,
-  outputDir: string,
+  baseDir: string,
   context?: string,
-): Promise<ExtractedMetadata> {
+): Promise<{ metadata: ExtractedMetadata; paperDir: string }> {
   info(`Extracting metadata from ${basename(pdfPath)}...`);
   if (context) {
     log(
@@ -149,7 +195,16 @@ async function runMetadata(
   const metadata = await extractMetadata(pdfPath, { context });
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
-  const paths = getOutputPaths(pdfPath, outputDir);
+  // Generate folder name from metadata and create it
+  const folderName = generateFolderName(metadata.title, metadata.year);
+  const parentDir = baseDir || dirname(pdfPath);
+  const paperDir = join(parentDir, folderName);
+
+  if (!existsSync(paperDir)) {
+    await mkdir(paperDir, { recursive: true });
+  }
+
+  const paths = getOutputPaths(paperDir);
   await writeFile(paths.metadataJson, JSON.stringify(metadata, null, 2));
 
   // Format authors for display
@@ -166,17 +221,21 @@ async function runMetadata(
   if (metadata.journal) log(`   Journal: ${metadata.journal}`);
   if (metadata.conference) log(`   Conference: ${metadata.conference}`);
   log(`   Figures: ${metadata.figures.length}`);
-  log(`   Output: ${paths.metadataJson}`);
+  log(`   Folder: ${paperDir}`);
 
-  return metadata;
+  return { metadata, paperDir };
 }
 
+/**
+ * Extract content and render HTML.
+ * Writes to the paper folder that was created during metadata extraction.
+ */
 async function runContent(
   pdfPath: string,
-  outputDir: string,
+  paperDir: string,
   metadata: ExtractedMetadata,
 ): Promise<string> {
-  const paths = getOutputPaths(pdfPath, outputDir);
+  const paths = getOutputPaths(paperDir);
 
   if (metadata.type === "slides") {
     info(`Document is slides - skipping content extraction`);
@@ -218,32 +277,37 @@ async function runContent(
   return markdown;
 }
 
+/**
+ * Run the full extraction pipeline.
+ * Creates a folder named {year}-{title-slug} inside the output directory.
+ */
 async function runFull(
   pdfPath: string,
-  outputDir: string,
+  baseDir: string,
   context?: string,
 ) {
-  // Ensure output directory exists
-  if (outputDir && !existsSync(outputDir)) {
-    await mkdir(outputDir, { recursive: true });
+  // Ensure base directory exists (if specified)
+  if (baseDir && !existsSync(baseDir)) {
+    await mkdir(baseDir, { recursive: true });
   }
 
   info(`Running full extraction pipeline...`);
   log("");
 
-  // Phase 1: Metadata + figures
-  const metadata = await runMetadata(pdfPath, outputDir, context);
+  // Phase 1: Metadata + figures (creates the paper folder)
+  const { metadata, paperDir } = await runMetadata(pdfPath, baseDir, context);
   log("");
 
   // Phase 2: Content + HTML (skip for slides)
   if (metadata.type !== "slides") {
-    await runContent(pdfPath, outputDir, metadata);
+    await runContent(pdfPath, paperDir, metadata);
   } else {
     info(`Skipping content extraction for slides`);
   }
 
   log("");
   success(`Pipeline complete!`);
+  log(`   ${colors.cyan}${paperDir}${colors.reset}`);
 }
 
 async function main() {
@@ -277,13 +341,17 @@ async function main() {
         await runMetadata(pdfPath, outputDir, context || undefined);
         break;
       case "content": {
-        // Content requires metadata first
-        const paths = getOutputPaths(pdfPath, outputDir);
+        // Content requires a paper folder with meta.json
+        // The folder was created by the 'metadata' command
+        if (!outputDir) {
+          error(`Content command requires --output-dir pointing to the paper folder.`);
+          error(`Run 'metadata' first to create the folder, or use 'full' for the complete pipeline.`);
+          process.exit(1);
+        }
+        const paths = getOutputPaths(outputDir);
         if (!existsSync(paths.metadataJson)) {
           error(`Metadata file not found: ${paths.metadataJson}`);
-          error(
-            `Run 'metadata' command first, or use 'full' for the complete pipeline.`,
-          );
+          error(`Run 'metadata' command first, or use 'full' for the complete pipeline.`);
           process.exit(1);
         }
         const metadataRaw = await readFile(paths.metadataJson, "utf-8");

@@ -33,7 +33,7 @@ This separation allows the content extraction model to focus entirely on accurat
 All items live in `$APPDIR/papers/`. Each processed PDF produces:
 
 ```
-paper-name/
+paper-name/         # year-name (if year is present) e.g. 2017-attention-is-all-you-need or cs4223-l3-cache-coherence
 ├── meta.json       # Bibliographic metadata + figure bounding boxes
 ├── source.pdf      # Original PDF file
 ├── content.md      # Extracted markdown
@@ -46,7 +46,7 @@ paper-name/
 
 ## CLI Tool
 
-The extraction CLI processes PDFs and outputs structured data.
+The extraction CLI processes PDFs and outputs structured data. It automatically creates a folder named `{year}-{title-slug}` for each paper.
 
 ### Location
 
@@ -57,40 +57,39 @@ bun run scripts/extract-cli.ts
 ### Commands
 
 ```bash
-# Extract metadata + figure bounding boxes (~5-15 seconds)
+# Full pipeline (recommended): metadata + content + HTML
+bun run scripts/extract-cli.ts full <pdf>
+
+# Extract metadata only (~5-15 seconds)
 bun run scripts/extract-cli.ts metadata <pdf>
 
-# Extract content + render HTML (~30-200 seconds)
-# Requires metadata to be extracted first
+# Extract content only (requires metadata first)
 bun run scripts/extract-cli.ts content <pdf>
-
-# Full pipeline: metadata + content + HTML
-bun run scripts/extract-cli.ts full <pdf>
 ```
 
 ### Options
 
-| Option                   | Description                                      |
-| ------------------------ | ------------------------------------------------ |
-| `--output-dir, -o <dir>` | Output directory (default: same as PDF)          |
-| `--context, -c <text>`   | Additional context (citation, course info, etc.) |
+| Option                   | Description                                               |
+| ------------------------ | --------------------------------------------------------- |
+| `--output-dir, -o <dir>` | Parent directory for paper folder (default: same as PDF) |
+| `--context, -c <text>`   | Additional context (citation, course info, etc.)          |
 
 ### Examples
 
 ```bash
-# Basic extraction
-bun run scripts/extract-cli.ts full paper.pdf
+# Process into ~/papers/2017-attention-is-all-you-need/
+bun run scripts/extract-cli.ts full attention.pdf -o ~/papers
 
-# With output directory
-bun run scripts/extract-cli.ts full paper.pdf -o ~/papers/attention-paper/
+# Organize by topic: ~/papers/ml/2017-attention-is-all-you-need/
+bun run scripts/extract-cli.ts full attention.pdf -o ~/papers/ml
 
 # With citation context (for book chapters, course readings, etc.)
-bun run scripts/extract-cli.ts full chapter.pdf \
+bun run scripts/extract-cli.ts full chapter.pdf -o ~/papers \
   --context "Smith, J. (2020). Chapter 3: Neural Networks. In Introduction to ML (pp. 45-67). MIT Press."
 
-# Batch processing with context for each
-bun run scripts/extract-cli.ts full reading1.pdf -c "Week 1: Johnson (2019), pp. 1-25"
-bun run scripts/extract-cli.ts full reading2.pdf -c "Week 1: Chen et al. (2021), Chapter 2"
+# Batch processing with context
+bun run scripts/extract-cli.ts full reading1.pdf -o ~/papers/course -c "Week 1: Johnson (2019)"
+bun run scripts/extract-cli.ts full reading2.pdf -o ~/papers/course -c "Week 1: Chen et al. (2021)"
 ```
 
 ### Environment
@@ -156,8 +155,8 @@ The `meta.json` file contains Zotero-compatible bibliographic data plus figure i
 ### 1. Process a single paper
 
 ```bash
-bun run scripts/extract-cli.ts full /path/to/paper.pdf -o ~/papers/paper-name/
-cp /path/to/paper.pdf ~/papers/paper-name/source.pdf
+# Folder is auto-created as ~/papers/2017-attention-is-all-you-need/
+bun run scripts/extract-cli.ts full /path/to/attention.pdf -o ~/papers
 ```
 
 ### 2. Process course readings with syllabus
@@ -165,15 +164,14 @@ cp /path/to/paper.pdf ~/papers/paper-name/source.pdf
 Given a syllabus with citations, process each reading:
 
 ```bash
-# For each reading in syllabus:
-bun run scripts/extract-cli.ts full reading.pdf \
-  -o ~/papers/course-name/week-N/ \
-  -c "Full APA citation from syllabus"
+# Each reading gets its own auto-named folder in ~/papers/cs229/
+bun run scripts/extract-cli.ts full reading1.pdf -o ~/papers/cs229 -c "Week 1: Johnson (2019)"
+bun run scripts/extract-cli.ts full reading2.pdf -o ~/papers/cs229 -c "Week 1: Chen et al. (2021)"
 ```
 
 ### 3. Add notes to a paper
 
-Write to `~/papers/paper-name/notes.md`
+Write to `~/papers/{paper-folder}/notes.md`
 
 ### 4. Search the library
 
