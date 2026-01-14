@@ -205,13 +205,12 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       {/* Main content */}
       {isLoading ? null : (
         <>
-          {/* Main scrollable paper content */}
+          {/* Article/PDF view with its own scroll container */}
           <div
-            className={`paper-scroll-container ${notesOpen ? "with-notes" : ""}`}
+            className="fixed top-[var(--titlebar-height)] bottom-0 left-0 overflow-auto"
             style={{
-              marginRight: notesOpen ? "40%" : undefined,
-              paddingTop:
-                viewMode === "md" ? "calc(var(--titlebar-height) + 3rem)" : "0", // Account for header bar
+              right: notesOpen ? "40%" : 0,
+              paddingTop: viewMode === "md" ? "3rem" : "0",
             }}
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -245,13 +244,13 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
             </AnimatePresence>
           </div>
 
-          {/* Fixed notes sidebar - starts below titlebar */}
+          {/* Notes sidebar with its own scroll container */}
           {notesOpen && initialNotes !== null && (
-            <div className="fixed top-0 right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col pt-[var(--titlebar-height)]">
+            <div className="fixed top-[var(--titlebar-height)] right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col">
               <NotesEditor
                 value={initialNotes}
                 onChange={handleNotesChange}
-                className="flex-1 overflow-hidden"
+                className="flex-1 overflow-auto"
                 placeholder="Start writing your notes..."
               />
             </div>
