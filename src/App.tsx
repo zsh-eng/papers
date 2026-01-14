@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { TabBar } from "@/components/tab-bar";
 import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useTabState } from "@/hooks/use-tab-state";
+import { useDarkMode } from "./hooks/use-dark-mode";
 
 /**
  * Shell App - renders only in the main webview.
@@ -13,6 +14,7 @@ export function App() {
 
   // Set up global keyboard shortcuts for tabs (calls Rust directly)
   useTabKeyboardShortcuts();
+  useDarkMode();
 
   if (isLoading) {
     return (
