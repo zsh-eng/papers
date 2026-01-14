@@ -29,6 +29,7 @@ interface NotesEditorProps {
 const obsidianTheme = EditorView.theme({
   // Base editor styles
   "&": {
+    "--editor-padding": "24px",
     height: "100%",
     fontSize: "16px",
   },
@@ -38,12 +39,17 @@ const obsidianTheme = EditorView.theme({
     overflow: "auto",
   },
   ".cm-content": {
-    padding: "24px",
+    padding: "var(--editor-padding)",
     caretColor: "var(--foreground)",
     maxWidth: "100%",
   },
   ".cm-line": {
     padding: "1px 0",
+  },
+  // Constrain selection layer to not extend into content padding
+  ".cm-selectionLayer": {
+    left: "var(--editor-padding) !important",
+    right: "var(--editor-padding) !important",
   },
   ".cm-activeLine": {
     backgroundColor: "transparent",
@@ -54,6 +60,8 @@ const obsidianTheme = EditorView.theme({
   ".cm-cursor": {
     borderLeftColor: "var(--foreground)",
   },
+
+
 
   // Headings - bold, sized, NO underline
   ".cm-heading": {
