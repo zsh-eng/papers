@@ -1,8 +1,11 @@
 import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor } from "@/components/notes-editor";
+import { PdfViewer } from "@/components/pdf-viewer";
+import { ViewModeToggle, type ViewMode } from "@/components/view-mode-toggle";
 import type { Paper } from "@/lib/papers";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { transformImageSources } from "@/lib/html";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface PaperReaderProps {
@@ -22,6 +25,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notesOpen, setNotesOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("md");
 
   // Ref to track pending save timeout
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -156,6 +160,12 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         e.preventDefault();
         setNotesOpen((prev) => !prev);
       }
+
+      // Cmd/Ctrl + Shift + P to toggle PDF/MD view
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "p") {
+        e.preventDefault();
+        setViewMode((prev) => (prev === "md" ? "pdf" : "md"));
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -166,16 +176,18 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Save status indicator - subtle */}
-      {(isSaving || lastSaved) && (
-        <div className="fixed top-[calc(var(--titlebar-height)+0.5rem)] right-6 z-20 text-xs text-muted-foreground/50 py-2">
+      <ViewModeToggle value={viewMode} onChange={setViewMode} />
+      {/* Header bar with toggle and save status */}
+      <div className="fixed top-[var(--titlebar-height)] left-0 right-0 z-20 flex items-center justify-between px-4 py-2">
+        {/* Save status indicator */}
+        <div className="text-xs text-muted-foreground/50">
           {isSaving
             ? "Saving..."
             : lastSaved
               ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
               : null}
         </div>
-      )}
+      </div>
 
       {/* Error banner */}
       {error && (
@@ -196,14 +208,41 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
           {/* Main scrollable paper content */}
           <div
             className={`paper-scroll-container ${notesOpen ? "with-notes" : ""}`}
-            style={notesOpen ? { marginRight: "40%" } : undefined}
+            style={{
+              marginRight: notesOpen ? "40%" : undefined,
+              paddingTop:
+                viewMode === "md" ? "calc(var(--titlebar-height) + 3rem)" : "0", // Account for header bar
+            }}
           >
-            <ArticleViewer
-              html={html}
-              title={paper.metadata.title}
-              authors={paper.metadata.authors}
-              className="pb-32 px-6"
-            />
+            <AnimatePresence mode="wait" initial={false}>
+              {viewMode === "md" ? (
+                <motion.div
+                  key="md"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                >
+                  <ArticleViewer
+                    html={html}
+                    title={paper.metadata.title}
+                    authors={paper.metadata.authors}
+                    className="pb-32 px-6"
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="pdf"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  className="h-full"
+                >
+                  <PdfViewer pdfPath={paper.pdfPath} className="h-full" />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Fixed notes sidebar - starts below titlebar */}
