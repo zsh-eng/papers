@@ -1,5 +1,7 @@
+import { CommandPalette } from "@/components/command-palette";
 import { PaperLibrary } from "@/components/paper-library";
 import { PaperReader } from "@/components/paper-reader";
+import { useCommandPalette } from "@/hooks/use-command-palette";
 import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useWorkspace } from "@/hooks/use-workspace";
 import type { Paper } from "@/lib/papers";
@@ -20,6 +22,10 @@ export function TabContent() {
 
   // Register tab keyboard shortcuts (shared hook, calls Rust directly)
   useTabKeyboardShortcuts();
+
+  // Command palette state (Cmd+P)
+  const { open: commandPaletteOpen, onOpenChange: setCommandPaletteOpen } =
+    useCommandPalette();
 
   // SPA state for in-tab navigation
   const [view, setView] = useState<"home" | "paper">(
@@ -103,14 +109,30 @@ export function TabContent() {
 
   // Paper view
   if (view === "paper" && currentPaper) {
-    return <PaperReader paper={currentPaper} onBack={handleBack} />;
+    return (
+      <>
+        <PaperReader paper={currentPaper} onBack={handleBack} />
+        <CommandPalette
+          open={commandPaletteOpen}
+          onOpenChange={setCommandPaletteOpen}
+          onSelectPaper={handleSelectPaper}
+        />
+      </>
+    );
   }
 
   // Home/Library view
   return (
-    <PaperLibrary
-      workspacePath={workspacePath}
-      onSelectPaper={handleSelectPaper}
-    />
+    <>
+      <PaperLibrary
+        workspacePath={workspacePath}
+        onSelectPaper={handleSelectPaper}
+      />
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        onSelectPaper={handleSelectPaper}
+      />
+    </>
   );
 }
