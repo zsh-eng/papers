@@ -1,11 +1,6 @@
 import { useEffect, useRef } from "react";
 import { EditorState } from "@codemirror/state";
-import {
-  EditorView,
-  keymap,
-  highlightActiveLine,
-  drawSelection,
-} from "@codemirror/view";
+import { EditorView, keymap, highlightActiveLine } from "@codemirror/view";
 import {
   defaultKeymap,
   history,
@@ -17,6 +12,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { vim } from "@replit/codemirror-vim";
 import { cn } from "@/lib/utils";
 import { obsidianMode } from "@/lib/codemirror/obsidian-mode";
+import { textSelection } from "@/lib/codemirror/text-selection";
 
 interface NotesEditorProps {
   value: string;
@@ -40,25 +36,16 @@ const obsidianTheme = EditorView.theme({
   },
   ".cm-content": {
     padding: "var(--editor-padding)",
-    caretColor: "var(--foreground)",
     maxWidth: "100%",
   },
   ".cm-line": {
     padding: "1px 0",
-  },
-  // Constrain selection layer to not extend into content padding
-  ".cm-selectionLayer": {
-    left: "var(--editor-padding) !important",
-    right: "var(--editor-padding) !important",
   },
   ".cm-activeLine": {
     backgroundColor: "transparent",
   },
   "&.cm-focused": {
     outline: "none",
-  },
-  ".cm-cursor": {
-    borderLeftColor: "var(--foreground)",
   },
 
   // Headings - bold, sized, NO underline
@@ -268,7 +255,7 @@ export function NotesEditor({
       doc: initialValue,
       extensions: [
         vim(),
-        drawSelection(),
+        textSelection,
         highlightActiveLine(),
         history(),
         markdown(),
