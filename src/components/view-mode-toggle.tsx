@@ -17,7 +17,7 @@ export function ViewModeToggle({
   return (
     <div
       className={cn(
-        "fixed top-0 right-2 inline-flex items-center rounded-md bg-muted p-0.5 z-20",
+        "fixed top-2 right-2 inline-flex items-center rounded-md bg-muted p-0.5 z-20",
         className,
       )}
     >

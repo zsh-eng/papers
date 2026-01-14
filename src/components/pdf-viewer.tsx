@@ -242,14 +242,14 @@ export function PdfViewer({
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
-      {/* Controls bar */}
-      <div className="flex items-center justify-center gap-4 py-2 px-4 border-b border-border bg-muted fixed bottom-0 left-0 right-0">
+      {/* Controls bar - positioned at top within container */}
+      <div className="sticky top-0 z-10 flex items-center justify-center gap-4 py-2 px-4 border-b border-border bg-muted">
         {/* Page navigation */}
         <div className="flex items-center gap-1">
           <button
             onClick={goToPrevPage}
             disabled={currentPage <= 1}
-            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-1 rounded hover:bg-muted-foreground/10 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Previous page"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -260,7 +260,7 @@ export function PdfViewer({
           <button
             onClick={goToNextPage}
             disabled={currentPage >= numPages}
-            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-1 rounded hover:bg-muted-foreground/10 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Next page"
           >
             <ChevronRight className="w-4 h-4" />
@@ -272,7 +272,7 @@ export function PdfViewer({
           <button
             onClick={zoomOut}
             disabled={zoomIndex <= 0}
-            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-1 rounded hover:bg-muted-foreground/10 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Zoom out"
           >
             <Minus className="w-4 h-4" />
@@ -283,7 +283,7 @@ export function PdfViewer({
           <button
             onClick={zoomIn}
             disabled={zoomIndex >= ZOOM_LEVELS.length - 1}
-            className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-1 rounded hover:bg-muted-foreground/10 disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Zoom in"
           >
             <Plus className="w-4 h-4" />
@@ -291,9 +291,9 @@ export function PdfViewer({
         </div>
       </div>
 
-      {/* PDF pages container */}
+      {/* PDF pages container - scrollable both directions */}
       <div ref={containerRef} className="flex-1 overflow-auto bg-muted/20">
-        <div className="flex flex-col items-center gap-4 p-4">
+        <div className="flex flex-col items-center gap-4 p-4 min-w-fit">
           {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
             <canvas
               key={pageNum}
@@ -306,7 +306,6 @@ export function PdfViewer({
                 }
               }}
               className="shadow-lg bg-white"
-              style={{ maxWidth: "100%" }}
             />
           ))}
         </div>
