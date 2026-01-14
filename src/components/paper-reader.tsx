@@ -5,7 +5,6 @@ import { ViewModeToggle, type ViewMode } from "@/components/view-mode-toggle";
 import type { Paper } from "@/lib/papers";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { transformImageSources } from "@/lib/html";
-import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface PaperReaderProps {
@@ -213,35 +212,16 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
               paddingTop: viewMode === "md" ? "3rem" : "0",
             }}
           >
-            <AnimatePresence mode="wait" initial={false}>
-              {viewMode === "md" ? (
-                <motion.div
-                  key="md"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2, ease: "easeInOut" }}
-                >
-                  <ArticleViewer
-                    html={html}
-                    title={paper.metadata.title}
-                    authors={paper.metadata.authors}
-                    className="pb-32 px-6"
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="pdf"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.2, ease: "easeInOut" }}
-                  className="h-full"
-                >
-                  <PdfViewer pdfPath={paper.pdfPath} className="h-full" />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {viewMode === "md" ? (
+              <ArticleViewer
+                html={html}
+                title={paper.metadata.title}
+                authors={paper.metadata.authors}
+                className="pb-32 px-6"
+              />
+            ) : (
+              <PdfViewer pdfPath={paper.pdfPath} className="h-full" />
+            )}
           </div>
 
           {/* Notes sidebar with its own scroll container */}
