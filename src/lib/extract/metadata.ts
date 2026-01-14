@@ -52,11 +52,16 @@ Scan the ENTIRE document for figures, images, diagrams, and charts.
 
 For each figure:
 1. Assign a unique ID: "fig_1", "fig_2", etc. in order of appearance
-2. Record the page number (0-indexed)
+2. Record the page number (1-indexed)
 3. Identify the bounding box [x1, y1, x2, y2] in PDF points (72 points = 1 inch)
    - Coordinates start from top-left of the page
    - Include the entire figure and its caption
 4. Extract the caption text if visible
+5. Provide bounding box coordinates on a 0-1000 normalized scale:
+   - (0, 0) = top-left corner of the page
+   - (1000, 1000) = bottom-right corner of the page
+   - Include the figure content but NOT the caption text in the bounding box
+   - If multiple sub-figures appear together (e.g., "(a)" and "(b)" side by side), treat them as ONE figure with a bounding box encompassing all sub-figures
 
 Include ALL figures in the document, not just the first few pages.`;
 
