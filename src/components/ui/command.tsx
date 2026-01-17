@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Command as CommandPrimitive } from "cmdk"
+import { Command as CommandPrimitive } from "cmdk";
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
-import { SearchIcon, CheckIcon } from "lucide-react"
+import { cn } from "@/lib/utils";
+import { SearchIcon } from "lucide-react";
 
 function Command({
   className,
@@ -15,11 +15,11 @@ function Command({
       data-slot="command"
       className={cn(
         "bg-popover text-popover-foreground flex size-full flex-col overflow-hidden",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 function CommandDialog({
@@ -30,26 +30,26 @@ function CommandDialog({
   open,
   onOpenChange,
 }: {
-  title?: string
-  description?: string
-  className?: string
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
-  children: React.ReactNode
+  title?: string;
+  description?: string;
+  className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children: React.ReactNode;
 }) {
   // Handle escape key
   React.useEffect(() => {
-    if (!open) return
+    if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onOpenChange?.(false)
+        onOpenChange?.(false);
       }
-    }
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [open, onOpenChange])
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onOpenChange]);
 
-  if (!open) return null
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50" data-slot="command-dialog">
@@ -63,7 +63,7 @@ function CommandDialog({
         className={cn(
           "absolute left-1/2 top-[12%] -translate-x-1/2 w-full max-w-3xl",
           "bg-popover rounded-xl ring-1 ring-border/50 shadow-2xl overflow-hidden",
-          className
+          className,
         )}
         role="dialog"
         aria-label={title}
@@ -75,7 +75,7 @@ function CommandDialog({
         {children}
       </div>
     </div>
-  )
+  );
 }
 
 function CommandInput({
@@ -83,31 +83,34 @@ function CommandInput({
   autoFocus = true,
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input> & {
-  autoFocus?: boolean
+  autoFocus?: boolean;
 }) {
-  const inputRef = React.useRef<HTMLInputElement>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (autoFocus) {
       // Focus immediately on mount
-      inputRef.current?.focus()
+      inputRef.current?.focus();
     }
-  }, [autoFocus])
+  }, [autoFocus]);
 
   return (
-    <div data-slot="command-input-wrapper" className="flex items-center gap-2 px-3 border-b border-border/50">
+    <div
+      data-slot="command-input-wrapper"
+      className="flex items-center gap-2 px-3 border-b border-border/50"
+    >
       <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
       <CommandPrimitive.Input
         ref={inputRef}
         data-slot="command-input"
         className={cn(
           "w-full h-11 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-          className
+          className,
         )}
         {...props}
       />
     </div>
-  )
+  );
 }
 
 function CommandList({
@@ -119,11 +122,11 @@ function CommandList({
       data-slot="command-list"
       className={cn(
         "no-scrollbar max-h-72 scroll-py-1 outline-none overflow-x-hidden overflow-y-auto",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 function CommandEmpty({
@@ -136,7 +139,7 @@ function CommandEmpty({
       className={cn("py-6 text-center text-sm", className)}
       {...props}
     />
-  )
+  );
 }
 
 function CommandGroup({
@@ -146,10 +149,13 @@ function CommandGroup({
   return (
     <CommandPrimitive.Group
       data-slot="command-group"
-      className={cn("text-foreground [&_[cmdk-group-heading]]:text-muted-foreground overflow-hidden p-1 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium", className)}
+      className={cn(
+        "text-foreground [&_[cmdk-group-heading]]:text-muted-foreground overflow-hidden p-1 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium",
+        className,
+      )}
       {...props}
     />
-  )
+  );
 }
 
 function CommandSeparator({
@@ -162,7 +168,7 @@ function CommandSeparator({
       className={cn("bg-border/50 my-1 h-px", className)}
       {...props}
     />
-  )
+  );
 }
 
 function CommandItem({
@@ -178,14 +184,14 @@ function CommandItem({
         "data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground",
         "data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
         "group/command-item",
-        className
+        className,
       )}
       {...props}
     >
       {children}
-      <CheckIcon className="ml-auto size-4 opacity-0 group-has-[[data-slot=command-shortcut]]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
+      {/*<CheckIcon className="ml-auto size-4 opacity-0 group-has-[[data-slot=command-shortcut]]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />*/}
     </CommandPrimitive.Item>
-  )
+  );
 }
 
 function CommandShortcut({
@@ -195,20 +201,23 @@ function CommandShortcut({
   return (
     <span
       data-slot="command-shortcut"
-      className={cn("text-muted-foreground group-data-selected/command-item:text-foreground ml-auto text-xs tracking-widest", className)}
+      className={cn(
+        "text-muted-foreground group-data-selected/command-item:text-foreground ml-auto text-xs tracking-widest",
+        className,
+      )}
       {...props}
     />
-  )
+  );
 }
 
 export {
   Command,
   CommandDialog,
-  CommandInput,
-  CommandList,
   CommandEmpty,
   CommandGroup,
+  CommandInput,
   CommandItem,
-  CommandShortcut,
+  CommandList,
   CommandSeparator,
-}
+  CommandShortcut,
+};
