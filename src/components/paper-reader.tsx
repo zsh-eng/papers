@@ -56,7 +56,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       }
     }
     loadContent();
-  }, [paper.htmlPath]);
+  }, [paper.htmlPath, paper.path]);
 
   // Load notes.md
   useEffect(() => {

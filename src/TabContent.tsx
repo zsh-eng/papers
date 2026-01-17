@@ -46,7 +46,7 @@ export function TabContent() {
   // Load paper data when this is a paper tab (initial load from URL)
   useEffect(() => {
     if (initialTabType === "paper" && paperPath) {
-      setIsPaperLoading(true);
+      // isPaperLoading is already initialized to true when conditions match
       loadPaper(decodeURIComponent(paperPath))
         .then((loadedPaper) => {
           if (loadedPaper) {
@@ -77,7 +77,7 @@ export function TabContent() {
   // Load markdown data when this is a markdown tab (initial load from URL)
   useEffect(() => {
     if (initialTabType === "markdown" && paperPath) {
-      setIsMarkdownLoading(true);
+      // isMarkdownLoading is already initialized to true when conditions match
       loadMarkdownFile(decodeURIComponent(paperPath))
         .then((loadedMarkdown) => {
           if (loadedMarkdown) {

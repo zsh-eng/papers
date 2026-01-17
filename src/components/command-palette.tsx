@@ -26,21 +26,44 @@ export function CommandPalette({
   onSelectPaper,
 }: CommandPaletteProps) {
   const { workspacePath } = useWorkspace();
-  const [papers, setPapers] = useState<PaperSearchItem[]>([]);
+  // null = not yet loaded for current workspace, empty array = loaded but empty
+  const [papers, setPapers] = useState<PaperSearchItem[] | null>(null);
   const [query, setQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Track which workspace we last loaded for
+  const [loadedWorkspace, setLoadedWorkspace] = useState<string | null>(null);
+
+  // Determine if we need to load: workspace changed or papers not yet loaded
+  const needsLoad = workspacePath && open && workspacePath !== loadedWorkspace;
+  const isLoading = needsLoad || papers === null;
 
   // Load all papers when workspace is ready
   useEffect(() => {
     if (!workspacePath || !open) return;
+    // Skip if already loaded for this workspace
+    if (workspacePath === loadedWorkspace && papers !== null) return;
 
-    setIsLoading(true);
+    let isCancelled = false;
+
     listAllPapers(workspacePath)
-      .then(setPapers)
-      .catch(console.error)
-      .finally(() => setIsLoading(false));
-  }, [workspacePath, open]);
+      .then((loadedPapers) => {
+        if (!isCancelled) {
+          setPapers(loadedPapers);
+          setLoadedWorkspace(workspacePath);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!isCancelled) {
+          setPapers([]); // Set to empty on error so we don't keep retrying
+          setLoadedWorkspace(workspacePath);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [workspacePath, open, loadedWorkspace, papers]);
 
   // Build MiniSearch index
   const searchIndex = useMemo(() => {
@@ -54,15 +77,16 @@ export function CommandPalette({
       },
     });
 
-    index.addAll(papers);
+    index.addAll(papers ?? []);
     return index;
   }, [papers]);
 
   // Get search results
   const results = useMemo(() => {
+    const paperList = papers ?? [];
     if (!query.trim()) {
       // Show all papers when no query, sorted by year desc
-      return papers.slice(0, 50);
+      return paperList.slice(0, 50);
     }
 
     const searchResults = searchIndex.search(query);
@@ -72,22 +96,19 @@ export function CommandPalette({
     });
   }, [query, searchIndex, papers]);
 
-  // Set initial selection when results change
-  useEffect(() => {
-    if (results.length > 0 && !selectedId) {
-      setSelectedId(results[0].id);
-    } else if (
-      results.length > 0 &&
-      !results.find((r) => r.id === selectedId)
-    ) {
-      setSelectedId(results[0].id);
+  // Derive effective selected ID - auto-select first result if current selection is invalid
+  const effectiveSelectedId = useMemo(() => {
+    if (results.length === 0) return null;
+    if (selectedId && results.find((r) => r.id === selectedId)) {
+      return selectedId;
     }
+    return results[0].id;
   }, [results, selectedId]);
 
   // Get the currently selected item for preview
   const selectedItem = useMemo(() => {
-    return results.find((r) => r.id === selectedId) || null;
-  }, [results, selectedId]);
+    return results.find((r) => r.id === effectiveSelectedId) || null;
+  }, [results, effectiveSelectedId]);
 
   const handleSelect = useCallback(
     async (
@@ -149,7 +170,7 @@ export function CommandPalette({
       <Command
         shouldFilter={false}
         onKeyDown={handleKeyDown}
-        value={selectedId || undefined}
+        value={effectiveSelectedId || undefined}
         onValueChange={handleValueChange}
       >
         <CommandInput
