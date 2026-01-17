@@ -186,6 +186,7 @@
     font-size: 105%;
     line-height: 1.65;
     text-align: justify;
+    hyphens: auto;
     /* Use CSS Grid to allow full-bleed content */
     display: grid;
     grid-template-columns:
