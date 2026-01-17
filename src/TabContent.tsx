@@ -178,6 +178,7 @@ export function TabContent() {
           open={commandPaletteOpen}
           onOpenChange={setCommandPaletteOpen}
           onSelectPaper={handleSelectPaper}
+          onSelectMarkdown={handleSelectMarkdown}
         />
       </>
     );
@@ -192,6 +193,7 @@ export function TabContent() {
           open={commandPaletteOpen}
           onOpenChange={setCommandPaletteOpen}
           onSelectPaper={handleSelectPaper}
+          onSelectMarkdown={handleSelectMarkdown}
         />
       </>
     );
@@ -209,6 +211,7 @@ export function TabContent() {
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
         onSelectPaper={handleSelectPaper}
+        onSelectMarkdown={handleSelectMarkdown}
       />
     </>
   );

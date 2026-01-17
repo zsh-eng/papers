@@ -8,8 +8,13 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { listAllPapers, type PaperSearchItem } from "@/lib/paper-search";
-import type { Paper } from "@/lib/papers";
+import {
+  listAllItems,
+  type MarkdownSearchItem,
+  type PaperSearchItem,
+  type SearchItem,
+} from "@/lib/paper-search";
+import type { MarkdownFile, Paper } from "@/lib/papers";
 import { invoke } from "@tauri-apps/api/core";
 import MiniSearch from "minisearch";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -18,44 +23,52 @@ interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectPaper: (paper: Paper, openInNewTab: boolean) => void;
+  onSelectMarkdown: (markdown: MarkdownFile, openInNewTab: boolean) => void;
+}
+
+interface LoadedItems {
+  papers: PaperSearchItem[];
+  markdowns: MarkdownSearchItem[];
 }
 
 export function CommandPalette({
   open,
   onOpenChange,
   onSelectPaper,
+  onSelectMarkdown,
 }: CommandPaletteProps) {
   const { workspacePath } = useWorkspace();
-  // null = not yet loaded for current workspace, empty array = loaded but empty
-  const [papers, setPapers] = useState<PaperSearchItem[] | null>(null);
+  // null = not yet loaded for current workspace
+  const [items, setItems] = useState<LoadedItems | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Track which workspace we last loaded for
   const [loadedWorkspace, setLoadedWorkspace] = useState<string | null>(null);
 
-  // Determine if we need to load: workspace changed or papers not yet loaded
+  // Determine if we need to load: workspace changed or items not yet loaded
   const needsLoad = workspacePath && open && workspacePath !== loadedWorkspace;
-  const isLoading = needsLoad || papers === null;
+  const isLoading = needsLoad || items === null;
 
-  // Load all papers when workspace is ready
+  // Load all items when workspace is ready
   useEffect(() => {
     if (!workspacePath || !open) return;
     // Skip if already loaded for this workspace
-    if (workspacePath === loadedWorkspace && papers !== null) return;
+    if (workspacePath === loadedWorkspace && items !== null) return;
 
     let isCancelled = false;
 
-    listAllPapers(workspacePath)
-      .then((loadedPapers) => {
+    listAllItems(workspacePath)
+      .then((loadedItems) => {
         if (!isCancelled) {
-          setPapers(loadedPapers);
+          setItems(loadedItems);
           setLoadedWorkspace(workspacePath);
         }
       })
       .catch((err) => {
         console.error(err);
         if (!isCancelled) {
-          setPapers([]); // Set to empty on error so we don't keep retrying
+          // Set to empty on error so we don't keep retrying
+          setItems({ papers: [], markdowns: [] });
           setLoadedWorkspace(workspacePath);
         }
       });
@@ -63,38 +76,55 @@ export function CommandPalette({
     return () => {
       isCancelled = true;
     };
-  }, [workspacePath, open, loadedWorkspace, papers]);
+  }, [workspacePath, open, loadedWorkspace, items]);
 
-  // Build MiniSearch index
+  // Combine papers and markdowns into a single list for display
+  // Papers first (sorted by year desc), then markdowns (sorted by modified date desc)
+  const allItems = useMemo((): SearchItem[] => {
+    if (!items) return [];
+    return [...items.papers, ...items.markdowns];
+  }, [items]);
+
+  // Build MiniSearch index for combined items
   const searchIndex = useMemo(() => {
-    const index = new MiniSearch<PaperSearchItem>({
-      fields: ["title", "authors", "year"],
-      storeFields: ["id", "title", "authors", "year", "displayPath", "paper"],
+    const index = new MiniSearch<SearchItem>({
+      fields: ["title", "authors", "author", "year"],
+      storeFields: [
+        "type",
+        "id",
+        "title",
+        "authors",
+        "author",
+        "year",
+        "displayPath",
+        "paper",
+        "markdown",
+        "modifiedAt",
+      ],
       searchOptions: {
-        boost: { title: 2, authors: 1.5, year: 1 },
+        boost: { title: 2, authors: 1.5, author: 1.5, year: 1 },
         fuzzy: 0.2,
         prefix: true,
       },
     });
 
-    index.addAll(papers ?? []);
+    index.addAll(allItems);
     return index;
-  }, [papers]);
+  }, [allItems]);
 
   // Get search results
-  const results = useMemo(() => {
-    const paperList = papers ?? [];
+  const results = useMemo((): SearchItem[] => {
     if (!query.trim()) {
-      // Show all papers when no query, sorted by year desc
-      return paperList.slice(0, 50);
+      // Show all items when no query (already sorted)
+      return allItems.slice(0, 50);
     }
 
     const searchResults = searchIndex.search(query);
     return searchResults.map((result) => {
       // MiniSearch returns the stored fields directly
-      return result as unknown as PaperSearchItem;
+      return result as unknown as SearchItem;
     });
-  }, [query, searchIndex, papers]);
+  }, [query, searchIndex, allItems]);
 
   // Derive effective selected ID - auto-select first result if current selection is invalid
   const effectiveSelectedId = useMemo(() => {
@@ -111,30 +141,43 @@ export function CommandPalette({
   }, [results, effectiveSelectedId]);
 
   const handleSelect = useCallback(
-    async (
-      item: PaperSearchItem,
-      e?: React.MouseEvent | React.KeyboardEvent,
-    ) => {
+    async (item: SearchItem, e?: React.MouseEvent | React.KeyboardEvent) => {
       const openInNewTab = e ? e.metaKey || e.ctrlKey : false;
 
-      if (openInNewTab) {
-        // Open in new tab via Rust
-        const title = item.paper.metadata.title || item.paper.id;
-        await invoke("create_tab", {
-          tabType: "paper",
-          paperPath: item.paper.path,
-          title,
-        });
+      if (item.type === "paper") {
+        if (openInNewTab) {
+          // Open paper in new tab via Rust
+          const title = item.paper.metadata.title || item.paper.id;
+          await invoke("create_tab", {
+            tabType: "paper",
+            paperPath: item.paper.path,
+            title,
+          });
+        } else {
+          // Navigate in current tab
+          onSelectPaper(item.paper, false);
+        }
       } else {
-        // Navigate in current tab
-        onSelectPaper(item.paper, false);
+        // Markdown
+        if (openInNewTab) {
+          // Open markdown in new tab via Rust
+          const title = item.markdown.metadata.title || item.markdown.id;
+          await invoke("create_tab", {
+            tabType: "markdown",
+            paperPath: item.markdown.path,
+            title,
+          });
+        } else {
+          // Navigate in current tab
+          onSelectMarkdown(item.markdown, false);
+        }
       }
 
       onOpenChange(false);
       setQuery("");
       setSelectedId(null);
     },
-    [onSelectPaper, onOpenChange],
+    [onSelectPaper, onSelectMarkdown, onOpenChange]
   );
 
   // Handle keyboard events for cmd+enter
@@ -146,13 +189,22 @@ export function CommandPalette({
         }
       }
     },
-    [selectedItem, handleSelect],
+    [selectedItem, handleSelect]
   );
 
   // Track selection changes from cmdk
   const handleValueChange = useCallback((value: string) => {
     setSelectedId(value);
   }, []);
+
+  // Format date for display
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   return (
     <CommandDialog
@@ -164,8 +216,8 @@ export function CommandPalette({
           setSelectedId(null);
         }
       }}
-      title="Search Papers"
-      description="Search for papers by title, author, or year"
+      title="Search"
+      description="Search for papers and notes by title, author, or year"
     >
       <Command
         shouldFilter={false}
@@ -174,7 +226,7 @@ export function CommandPalette({
         onValueChange={handleValueChange}
       >
         <CommandInput
-          placeholder="Search papers..."
+          placeholder="Search papers and notes..."
           value={query}
           onValueChange={setQuery}
         />
@@ -184,19 +236,25 @@ export function CommandPalette({
             <CommandList className="max-h-100 h-full">
               {isLoading ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">
-                  Loading papers...
+                  Loading...
                 </div>
               ) : (
                 <>
-                  <CommandEmpty>No papers found.</CommandEmpty>
+                  <CommandEmpty>No results found.</CommandEmpty>
                   <CommandGroup>
                     {results.map((item) => (
                       <CommandItem
                         key={item.id}
                         value={item.id}
                         onSelect={() => handleSelect(item)}
+                        className="flex items-center justify-between gap-2"
                       >
-                        <span className="truncate">{item.title}</span>
+                        <span className="truncate flex-1">{item.title}</span>
+                        {item.type === "markdown" && (
+                          <span className="text-xs font-medium text-muted-foreground shrink-0">
+                            MD
+                          </span>
+                        )}
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -214,16 +272,35 @@ export function CommandPalette({
                 </h3>
 
                 <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Authors</span>
-                    <span className="text-right max-w-[60%] text-wrap line-clamp-3 text-ellipsis">
-                      {selectedItem.authors || "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Year</span>
-                    <span>{selectedItem.year || "—"}</span>
-                  </div>
+                  {selectedItem.type === "paper" ? (
+                    // Paper preview
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Authors</span>
+                        <span className="text-right max-w-[60%] text-wrap line-clamp-3 text-ellipsis">
+                          {selectedItem.authors || "—"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Year</span>
+                        <span>{selectedItem.year || "—"}</span>
+                      </div>
+                    </>
+                  ) : (
+                    // Markdown preview
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Author</span>
+                        <span className="text-right max-w-[60%] truncate">
+                          {selectedItem.author || "—"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Modified</span>
+                        <span>{formatDate(selectedItem.modifiedAt)}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Location</span>
                     <span className="text-right max-w-[60%] truncate">
@@ -234,7 +311,7 @@ export function CommandPalette({
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                No paper selected
+                No item selected
               </div>
             )}
           </div>
