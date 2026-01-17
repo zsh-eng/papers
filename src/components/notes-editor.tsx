@@ -30,7 +30,7 @@ const obsidianTheme = EditorView.theme({
     fontSize: "16px",
   },
   ".cm-scroller": {
-    fontFamily: "'Outfit', system-ui, sans-serif",
+    fontFamily: "'EB Garamond', system-ui, sans-serif",
     lineHeight: "1.75",
     overflow: "auto",
   },
