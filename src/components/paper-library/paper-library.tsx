@@ -6,20 +6,22 @@ import {
 } from "@/components/ui/context-menu";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 import { usePaperLibrary } from "@/hooks/use-paper-library";
-import type { Paper } from "@/lib/papers";
+import type { MarkdownFile, Paper } from "@/lib/papers";
 import { useEffect, useState } from "react";
 import { LibraryBreadcrumb } from "./library-breadcrumb";
 import { CreateFolderDialog, DeleteConfirmDialog } from "./library-dialogs";
-import { FolderRow, PaperRow } from "./library-rows";
+import { FolderRow, MarkdownRow, PaperRow } from "./library-rows";
 
 interface PaperLibraryProps {
   workspacePath: string;
   onSelectPaper: (paper: Paper, openInNewTab: boolean) => void;
+  onSelectMarkdown: (markdown: MarkdownFile, openInNewTab: boolean) => void;
 }
 
 export function PaperLibrary({
   workspacePath,
   onSelectPaper,
+  onSelectMarkdown,
 }: PaperLibraryProps) {
   const {
     currentPath,
@@ -62,9 +64,13 @@ export function PaperLibrary({
 
   // Get unique ID for an item (for hover state)
   const getItemId = (item: (typeof items)[0]): string => {
-    return item.type === "folder"
-      ? `folder:${item.path}`
-      : `paper:${item.paper.id}`;
+    if (item.type === "folder") {
+      return `folder:${item.path}`;
+    } else if (item.type === "paper") {
+      return `paper:${item.paper.id}`;
+    } else {
+      return `markdown:${item.markdown.id}`;
+    }
   };
 
   return (
@@ -138,7 +144,7 @@ export function PaperLibrary({
                         </ContextMenuContent>
                       </ContextMenu>
                     );
-                  } else {
+                  } else if (item.type === "paper") {
                     return (
                       <ContextMenu key={itemId}>
                         <ContextMenuTrigger>
@@ -166,6 +172,38 @@ export function PaperLibrary({
                             className="text-destructive focus:text-destructive"
                           >
                             Delete Paper
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    );
+                  } else {
+                    // Markdown file
+                    return (
+                      <ContextMenu key={itemId}>
+                        <ContextMenuTrigger>
+                          <MarkdownRow
+                            markdown={item.markdown}
+                            onClick={(openInNewTab) =>
+                              onSelectMarkdown(item.markdown, openInNewTab)
+                            }
+                            onContextMenu={() => {}}
+                            isHovered={hoveredItemId === itemId}
+                            isAnyHovered={hoveredItemId !== null}
+                            onHover={() => setHoveredItemId(itemId)}
+                          />
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem
+                            onClick={() => {
+                              setItemToDelete({
+                                path: item.markdown.path,
+                                name: item.markdown.metadata.title,
+                              });
+                              setDeleteDialogOpen(true);
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            Delete Markdown
                           </ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>

@@ -1,6 +1,7 @@
-import { readDir, stat, readTextFile } from "@tauri-apps/plugin-fs";
+import type { Author, ExtractedMetadata } from "@/lib/extract/types";
 import { pathExists } from "@/lib/fs";
-import type { ExtractedMetadata, Author } from "@/lib/extract/types";
+import { extractAuthor, extractTitle, parseMarkdown } from "@/lib/markdown";
+import { readDir, readTextFile, stat } from "@tauri-apps/plugin-fs";
 
 export interface PaperMetadata {
   type: string;
@@ -35,7 +36,26 @@ export interface LibraryPaper {
   paper: Paper;
 }
 
-export type LibraryItem = LibraryFolder | LibraryPaper;
+// Markdown file types
+export interface MarkdownMetadata {
+  title: string;
+  author?: string;
+}
+
+export interface MarkdownFile {
+  id: string; // filename without extension
+  path: string; // full path
+  filename: string; // e.g. "notes.md"
+  modifiedAt: Date;
+  metadata: MarkdownMetadata;
+}
+
+export interface LibraryMarkdown {
+  type: "markdown";
+  markdown: MarkdownFile;
+}
+
+export type LibraryItem = LibraryFolder | LibraryPaper | LibraryMarkdown;
 
 /**
  * Regex to identify paper folders: {year}-{slug}
@@ -174,6 +194,49 @@ async function countDirectoryItems(dirPath: string): Promise<number> {
 }
 
 /**
+ * Load a markdown file from its path
+ */
+export async function loadMarkdownFile(
+  filePath: string,
+): Promise<MarkdownFile | null> {
+  try {
+    const content = await readTextFile(filePath);
+    const parsed = parseMarkdown(content);
+
+    // Extract title (fallback to filename without extension)
+    const filename = filePath.split("/").pop() || filePath;
+    const id = filename.replace(/\.md$/i, "");
+    const title = extractTitle(parsed) || id;
+    const author = extractAuthor(parsed);
+
+    // Get file modification time
+    let modifiedAt = new Date();
+    try {
+      const fileInfo = await stat(filePath);
+      if (fileInfo.mtime) {
+        modifiedAt = new Date(fileInfo.mtime);
+      }
+    } catch {
+      // Use current date as fallback
+    }
+
+    return {
+      id,
+      path: filePath,
+      filename,
+      modifiedAt,
+      metadata: {
+        title,
+        author,
+      },
+    };
+  } catch (error) {
+    console.error(`Error loading markdown file ${filePath}:`, error);
+    return null;
+  }
+}
+
+/**
  * List library items (folders and papers) from a specific directory path
  * Used for folder-based navigation in the library view
  */
@@ -190,36 +253,44 @@ export async function listLibraryItems(
     const items: LibraryItem[] = [];
 
     for (const entry of entries) {
-      // Only process directories
-      if (!entry.isDirectory) {
-        continue;
-      }
-
       const entryPath = `${directoryPath}/${entry.name}`;
 
-      if (isPaperFolder(entry.name)) {
-        // This is a paper folder - load it as a paper
-        const paper = await loadPaper(entryPath);
-        if (paper) {
-          items.push({ type: "paper", paper });
+      if (entry.isDirectory) {
+        if (isPaperFolder(entry.name)) {
+          // This is a paper folder - load it as a paper
+          const paper = await loadPaper(entryPath);
+          if (paper) {
+            items.push({ type: "paper", paper });
+          }
+        } else {
+          // This is a regular folder - count its contents
+          const itemCount = await countDirectoryItems(entryPath);
+          items.push({
+            type: "folder",
+            name: entry.name,
+            path: entryPath,
+            itemCount,
+          });
         }
-      } else {
-        // This is a regular folder - count its contents
-        const itemCount = await countDirectoryItems(entryPath);
-        items.push({
-          type: "folder",
-          name: entry.name,
-          path: entryPath,
-          itemCount,
-        });
+      } else if (entry.isFile && entry.name.endsWith(".md")) {
+        // This is a markdown file
+        const markdown = await loadMarkdownFile(entryPath);
+        if (markdown) {
+          items.push({ type: "markdown", markdown });
+        }
       }
     }
 
-    // Sort: folders first (alphabetically), then papers (by year desc, then title asc)
+    // Sort: folders first (alphabetically), then papers (by year desc, then title asc), then markdown (by title)
     return items.sort((a, b) => {
-      // Folders come first
-      if (a.type === "folder" && b.type === "paper") return -1;
-      if (a.type === "paper" && b.type === "folder") return 1;
+      // Define type order: folder=0, paper=1, markdown=2
+      const typeOrder = { folder: 0, paper: 1, markdown: 2 };
+      const orderA = typeOrder[a.type];
+      const orderB = typeOrder[b.type];
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
 
       // Both folders: sort alphabetically
       if (a.type === "folder" && b.type === "folder") {
@@ -235,6 +306,13 @@ export async function listLibraryItems(
         }
         const titleA = a.paper.metadata.title.toLowerCase();
         const titleB = b.paper.metadata.title.toLowerCase();
+        return titleA.localeCompare(titleB);
+      }
+
+      // Both markdown: sort by title
+      if (a.type === "markdown" && b.type === "markdown") {
+        const titleA = a.markdown.metadata.title.toLowerCase();
+        const titleB = b.markdown.metadata.title.toLowerCase();
         return titleA.localeCompare(titleB);
       }
 

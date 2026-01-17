@@ -1,11 +1,12 @@
 import { CommandPalette } from "@/components/command-palette";
+import { MarkdownReader } from "@/components/markdown-reader";
 import { PaperLibrary } from "@/components/paper-library";
 import { PaperReader } from "@/components/paper-reader";
 import { useCommandPalette } from "@/hooks/use-command-palette";
 import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useWorkspace } from "@/hooks/use-workspace";
-import type { Paper } from "@/lib/papers";
-import { loadPaper } from "@/lib/papers";
+import type { MarkdownFile, Paper } from "@/lib/papers";
+import { loadPaper, loadMarkdownFile } from "@/lib/papers";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 
@@ -28,12 +29,18 @@ export function TabContent() {
     useCommandPalette();
 
   // SPA state for in-tab navigation
-  const [view, setView] = useState<"home" | "paper">(
-    initialTabType as "home" | "paper",
+  const [view, setView] = useState<"home" | "paper" | "markdown">(
+    initialTabType as "home" | "paper" | "markdown",
   );
   const [currentPaper, setCurrentPaper] = useState<Paper | null>(null);
+  const [currentMarkdown, setCurrentMarkdown] = useState<MarkdownFile | null>(
+    null,
+  );
   const [isPaperLoading, setIsPaperLoading] = useState(
     initialTabType === "paper" && !!paperPath,
+  );
+  const [isMarkdownLoading, setIsMarkdownLoading] = useState(
+    initialTabType === "markdown" && !!paperPath,
   );
 
   // Load paper data when this is a paper tab (initial load from URL)
@@ -67,6 +74,37 @@ export function TabContent() {
     }
   }, [initialTabType, paperPath]);
 
+  // Load markdown data when this is a markdown tab (initial load from URL)
+  useEffect(() => {
+    if (initialTabType === "markdown" && paperPath) {
+      setIsMarkdownLoading(true);
+      loadMarkdownFile(decodeURIComponent(paperPath))
+        .then((loadedMarkdown) => {
+          if (loadedMarkdown) {
+            setCurrentMarkdown(loadedMarkdown);
+            setView("markdown");
+            // Update tab title with markdown name
+            const title = loadedMarkdown.metadata.title;
+            invoke("update_current_tab_title", { title });
+          } else {
+            // Markdown not found, fall back to home view
+            console.error("Markdown not found at path:", paperPath);
+            setView("home");
+            invoke("update_current_tab_title", { title: "Library" });
+          }
+        })
+        .catch((err: unknown) => {
+          console.error("Failed to load markdown:", err);
+          // Fall back to home view
+          setView("home");
+          invoke("update_current_tab_title", { title: "Library" });
+        })
+        .finally(() => {
+          setIsMarkdownLoading(false);
+        });
+    }
+  }, [initialTabType, paperPath]);
+
   // Handle paper selection from library (SPA navigation, no Rust call)
   const handleSelectPaper = useCallback(
     async (selectedPaper: Paper, openInNewTab: boolean) => {
@@ -90,16 +128,40 @@ export function TabContent() {
     [],
   );
 
+  // Handle markdown selection from library (SPA navigation)
+  const handleSelectMarkdown = useCallback(
+    async (selectedMarkdown: MarkdownFile, openInNewTab: boolean) => {
+      if (openInNewTab) {
+        // Create a new tab via Rust
+        const title = selectedMarkdown.metadata.title;
+        await invoke("create_tab", {
+          tabType: "markdown",
+          paperPath: selectedMarkdown.path,
+          title,
+        });
+      } else {
+        // Navigate within this tab (SPA style)
+        setCurrentMarkdown(selectedMarkdown);
+        setView("markdown");
+        // Update tab title with markdown name
+        const title = selectedMarkdown.metadata.title;
+        await invoke("update_current_tab_title", { title });
+      }
+    },
+    [],
+  );
+
   // Handle back navigation from paper reader (SPA navigation)
   const handleBack = useCallback(async () => {
     setView("home");
     setCurrentPaper(null);
+    setCurrentMarkdown(null);
     // Update tab title back to Library
     await invoke("update_current_tab_title", { title: "Library" });
   }, []);
 
   // Loading states or workspace not ready
-  if (isWorkspaceLoading || isPaperLoading || !workspacePath) {
+  if (isWorkspaceLoading || isPaperLoading || isMarkdownLoading || !workspacePath) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
@@ -121,12 +183,27 @@ export function TabContent() {
     );
   }
 
+  // Markdown view
+  if (view === "markdown" && currentMarkdown) {
+    return (
+      <>
+        <MarkdownReader markdown={currentMarkdown} onBack={handleBack} />
+        <CommandPalette
+          open={commandPaletteOpen}
+          onOpenChange={setCommandPaletteOpen}
+          onSelectPaper={handleSelectPaper}
+        />
+      </>
+    );
+  }
+
   // Home/Library view
   return (
     <>
       <PaperLibrary
         workspacePath={workspacePath}
         onSelectPaper={handleSelectPaper}
+        onSelectMarkdown={handleSelectMarkdown}
       />
       <CommandPalette
         open={commandPaletteOpen}

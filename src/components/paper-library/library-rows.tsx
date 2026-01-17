@@ -1,4 +1,4 @@
-import type { LibraryFolder, Paper } from "@/lib/papers";
+import type { LibraryFolder, MarkdownFile, Paper } from "@/lib/papers";
 import { cn } from "@/lib/utils";
 
 interface RowHoverProps {
@@ -146,6 +146,72 @@ export function PaperRow({
       <span className={titleClass}>{displayTitle}</span>
       <span className={cn(mutedClass, "text-right truncate")}>
         {displayAuthors || "—"}
+      </span>
+    </div>
+  );
+}
+
+interface MarkdownRowProps extends RowHoverProps {
+  markdown: MarkdownFile;
+  onClick: (openInNewTab: boolean) => void;
+  onContextMenu: () => void;
+}
+
+export function MarkdownRow({
+  markdown,
+  onClick,
+  onContextMenu,
+  isHovered,
+  isAnyHovered,
+  onHover,
+}: MarkdownRowProps) {
+  const { metadata } = markdown;
+  const displayTitle = metadata.title;
+  const displayAuthor = metadata.author || null;
+
+  const handleClick = (e: React.MouseEvent | React.KeyboardEvent) => {
+    const openInNewTab = e.metaKey || e.ctrlKey;
+    onClick(openInNewTab);
+  };
+
+  const titleClass = cn(
+    "flex-1 min-w-0 transition-colors duration-200",
+    isHovered
+      ? "text-foreground"
+      : isAnyHovered
+        ? "text-muted-foreground/80"
+        : "text-foreground",
+  );
+
+  const mutedClass = cn(
+    "transition-colors duration-200",
+    isAnyHovered && !isHovered
+      ? "text-muted-foreground/80"
+      : "text-muted-foreground",
+  );
+
+  return (
+    <div
+      className="grid grid-cols-[4rem_1fr_minmax(12rem,auto)] gap-4 py-3 border-b border-border/40 items-baseline cursor-pointer"
+      onClick={handleClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onContextMenu();
+      }}
+      onMouseEnter={onHover}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleClick(e);
+        }
+      }}
+    >
+      <span className={cn(mutedClass, "text-xs font-medium")}>MD</span>
+      <span className={titleClass}>{displayTitle}</span>
+      <span className={cn(mutedClass, "text-right truncate")}>
+        {displayAuthor || "—"}
       </span>
     </div>
   );
