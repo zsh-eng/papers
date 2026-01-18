@@ -14,11 +14,11 @@ import type { ContentOptions, Figure } from "./types";
  * If figures are provided, include placeholders for the model to insert.
  */
 function buildPrompt(figures: Figure[]): string {
-  let prompt = `Convert this PDF to clean, well-structured markdown.
+  let prompt = `Transcribe this PDF document into markdown for academic research purposes.
 
 ## Guidelines
 
-1. Preserve ALL text content accurately - do not summarize or skip sections
+1. Transcribe ALL text content accurately from the images/pages. Do not summarize or skip sections.
 2. Use proper heading levels (# for title, ## for sections, ### for subsections)
 3. Format lists, tables, and code blocks appropriately
 4. For mathematical equations, use LaTeX syntax:
@@ -31,8 +31,10 @@ function buildPrompt(figures: Figure[]): string {
    - Redundant whitespace
 
 ## Tables
-
 Use standard markdown table syntax. Preserve alignment where possible.
+
+## Important Note
+This transcription is for personal research and fair use analysis of the provided document. Please provide the full text as it appears in the PDF.
 
 ## Output
 
