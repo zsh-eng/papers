@@ -2,8 +2,10 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 import { usePaperLibrary } from "@/hooks/use-paper-library";
 import type { MarkdownFile, Paper } from "@/lib/papers";
@@ -37,6 +39,9 @@ export function PaperLibrary({
 
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const { isDark, toggle } = useDarkMode();
+
+  // Detect macOS for context menu labels
+  const isMac = navigator.platform.toUpperCase().includes("MAC");
 
   // Dialog states
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
@@ -130,6 +135,17 @@ export function PaperLibrary({
                         </ContextMenuTrigger>
                         <ContextMenuContent>
                           <ContextMenuItem
+                            onClick={() => revealItemInDir(item.path)}
+                          >
+                            {isMac ? "Reveal in Finder" : "Reveal in File Explorer"}
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            onClick={() => navigator.clipboard.writeText(item.path)}
+                          >
+                            Copy Path
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
                             onClick={() => {
                               setItemToDelete({
                                 path: item.path,
@@ -160,6 +176,17 @@ export function PaperLibrary({
                           />
                         </ContextMenuTrigger>
                         <ContextMenuContent>
+                          <ContextMenuItem
+                            onClick={() => revealItemInDir(item.paper.path)}
+                          >
+                            {isMac ? "Reveal in Finder" : "Reveal in File Explorer"}
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            onClick={() => navigator.clipboard.writeText(item.paper.path)}
+                          >
+                            Copy Path
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
                           <ContextMenuItem
                             onClick={() => {
                               setItemToDelete({
@@ -193,6 +220,17 @@ export function PaperLibrary({
                           />
                         </ContextMenuTrigger>
                         <ContextMenuContent>
+                          <ContextMenuItem
+                            onClick={() => revealItemInDir(item.markdown.path)}
+                          >
+                            {isMac ? "Reveal in Finder" : "Reveal in File Explorer"}
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            onClick={() => navigator.clipboard.writeText(item.markdown.path)}
+                          >
+                            Copy Path
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
                           <ContextMenuItem
                             onClick={() => {
                               setItemToDelete({

@@ -90,6 +90,8 @@
       "allow": [{ "path": "$APPDATA/**" }]
     },
     "dialog:default",
-    "store:default"
+    "store:default",
+    "opener:default",
+    "opener:allow-reveal-item-in-dir"
   ]
 }
