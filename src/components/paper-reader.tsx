@@ -225,8 +225,10 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
           </div>
 
           {/* Notes sidebar with its own scroll container */}
-          {notesOpen && initialNotes !== null && (
-            <div className="fixed top-0 right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col">
+          {initialNotes !== null && (
+            <div
+              className={`fixed top-0 right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col ${!notesOpen ? "hidden" : ""}`}
+            >
               <NotesEditor
                 value={initialNotes}
                 onChange={handleNotesChange}
