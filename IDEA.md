@@ -69,10 +69,10 @@ bun run scripts/extract-cli.ts content <pdf>
 
 ### Options
 
-| Option                   | Description                                               |
-| ------------------------ | --------------------------------------------------------- |
+| Option                   | Description                                              |
+| ------------------------ | -------------------------------------------------------- |
 | `--output-dir, -o <dir>` | Parent directory for paper folder (default: same as PDF) |
-| `--context, -c <text>`   | Additional context (citation, course info, etc.)          |
+| `--context, -c <text>`   | Additional context (citation, course info, etc.)         |
 
 ### Examples
 

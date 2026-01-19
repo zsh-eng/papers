@@ -177,7 +177,7 @@ export function CommandPalette({
       setQuery("");
       setSelectedId(null);
     },
-    [onSelectPaper, onSelectMarkdown, onOpenChange]
+    [onSelectPaper, onSelectMarkdown, onOpenChange],
   );
 
   // Handle keyboard events for cmd+enter
@@ -189,7 +189,7 @@ export function CommandPalette({
         }
       }
     },
-    [selectedItem, handleSelect]
+    [selectedItem, handleSelect],
   );
 
   // Track selection changes from cmdk

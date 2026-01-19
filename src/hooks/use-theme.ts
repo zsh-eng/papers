@@ -84,7 +84,7 @@ export function useDarkMode() {
       const newTheme = isDark ? "light" : "dark";
       toggleMutation.mutate(newTheme);
     },
-    [isDark, toggleMutation]
+    [isDark, toggleMutation],
   );
 
   return { isDark, toggle, isLoaded };

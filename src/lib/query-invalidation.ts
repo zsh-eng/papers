@@ -22,10 +22,7 @@ export function broadcastInvalidation(queryKey: QueryKey): void {
  * Returns an unsubscribe function.
  */
 export function setupQueryInvalidationListener(): Promise<UnlistenFn> {
-  return listen<QueryInvalidationPayload>(
-    QUERY_INVALIDATED_EVENT,
-    (event) => {
-      queryClient.invalidateQueries({ queryKey: event.payload.queryKey });
-    }
-  );
+  return listen<QueryInvalidationPayload>(QUERY_INVALIDATED_EVENT, (event) => {
+    queryClient.invalidateQueries({ queryKey: event.payload.queryKey });
+  });
 }

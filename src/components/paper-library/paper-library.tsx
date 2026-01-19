@@ -137,10 +137,14 @@ export function PaperLibrary({
                           <ContextMenuItem
                             onClick={() => revealItemInDir(item.path)}
                           >
-                            {isMac ? "Reveal in Finder" : "Reveal in File Explorer"}
+                            {isMac
+                              ? "Reveal in Finder"
+                              : "Reveal in File Explorer"}
                           </ContextMenuItem>
                           <ContextMenuItem
-                            onClick={() => navigator.clipboard.writeText(item.path)}
+                            onClick={() =>
+                              navigator.clipboard.writeText(item.path)
+                            }
                           >
                             Copy Path
                           </ContextMenuItem>
@@ -179,10 +183,14 @@ export function PaperLibrary({
                           <ContextMenuItem
                             onClick={() => revealItemInDir(item.paper.path)}
                           >
-                            {isMac ? "Reveal in Finder" : "Reveal in File Explorer"}
+                            {isMac
+                              ? "Reveal in Finder"
+                              : "Reveal in File Explorer"}
                           </ContextMenuItem>
                           <ContextMenuItem
-                            onClick={() => navigator.clipboard.writeText(item.paper.path)}
+                            onClick={() =>
+                              navigator.clipboard.writeText(item.paper.path)
+                            }
                           >
                             Copy Path
                           </ContextMenuItem>
@@ -223,10 +231,14 @@ export function PaperLibrary({
                           <ContextMenuItem
                             onClick={() => revealItemInDir(item.markdown.path)}
                           >
-                            {isMac ? "Reveal in Finder" : "Reveal in File Explorer"}
+                            {isMac
+                              ? "Reveal in Finder"
+                              : "Reveal in File Explorer"}
                           </ContextMenuItem>
                           <ContextMenuItem
-                            onClick={() => navigator.clipboard.writeText(item.markdown.path)}
+                            onClick={() =>
+                              navigator.clipboard.writeText(item.markdown.path)
+                            }
                           >
                             Copy Path
                           </ContextMenuItem>

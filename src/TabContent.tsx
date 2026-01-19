@@ -165,7 +165,12 @@ export function TabContent() {
   }, []);
 
   // Loading states or workspace not ready
-  if (isWorkspaceLoading || isPaperLoading || isMarkdownLoading || !workspacePath) {
+  if (
+    isWorkspaceLoading ||
+    isPaperLoading ||
+    isMarkdownLoading ||
+    !workspacePath
+  ) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>

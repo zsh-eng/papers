@@ -2,7 +2,10 @@ import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor } from "@/components/notes-editor";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { ViewModeToggle, type ViewMode } from "@/components/view-mode-toggle";
-import { useAnnotationsQuery, useSaveAnnotationsMutation } from "@/hooks/use-annotations";
+import {
+  useAnnotationsQuery,
+  useSaveAnnotationsMutation,
+} from "@/hooks/use-annotations";
 import {
   usePaperHtmlQuery,
   usePaperNotesQuery,
@@ -37,14 +40,17 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
   // Query hooks
-  const { data: html, isLoading: isLoadingHtml, error: htmlError } = usePaperHtmlQuery(paper);
+  const {
+    data: html,
+    isLoading: isLoadingHtml,
+    error: htmlError,
+  } = usePaperHtmlQuery(paper);
   const { data: initialNotes, isLoading: isLoadingNotes } = usePaperNotesQuery(
     paper.path,
-    paper.metadata.title
+    paper.metadata.title,
   );
-  const { data: loadedAnnotations, isLoading: isLoadingAnnotations } = useAnnotationsQuery(
-    paper.path
-  );
+  const { data: loadedAnnotations, isLoading: isLoadingAnnotations } =
+    useAnnotationsQuery(paper.path);
 
   // Derive error from query errors and action errors
   const error = useMemo(() => {
@@ -66,7 +72,9 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   // Ref to track current notes value (not state to avoid re-renders)
   const currentNotesRef = useRef<string>("");
   // Ref to track pending annotation save timeout
-  const annotationSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const annotationSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   // Ref to track if annotations have been modified
   const annotationsModifiedRef = useRef(false);
   // Ref to track current annotations value
@@ -107,7 +115,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         setIsSaving(false);
       }
     },
-    [paper.path, saveNotesMutation]
+    [paper.path, saveNotesMutation],
   );
 
   // Save annotations to file
@@ -130,7 +138,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         setIsSaving(false);
       }
     },
-    [paper.path, saveAnnotationsMutation]
+    [paper.path, saveAnnotationsMutation],
   );
 
   // Handle creating a new annotation
@@ -146,7 +154,10 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         position,
       };
 
-      const updatedAnnotations = [...currentAnnotationsRef.current, newAnnotation];
+      const updatedAnnotations = [
+        ...currentAnnotationsRef.current,
+        newAnnotation,
+      ];
       setAnnotations(updatedAnnotations);
       currentAnnotationsRef.current = updatedAnnotations;
       annotationsModifiedRef.current = true;
@@ -159,14 +170,14 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         saveAnnotationsToFile(updatedAnnotations);
       }, AUTO_SAVE_DELAY);
     },
-    [saveAnnotationsToFile]
+    [saveAnnotationsToFile],
   );
 
   // Handle deleting an annotation
   const handleAnnotationDelete = useCallback(
     (id: string) => {
       const updatedAnnotations = currentAnnotationsRef.current.filter(
-        (ann) => ann.id !== id
+        (ann) => ann.id !== id,
       );
       setAnnotations(updatedAnnotations);
       currentAnnotationsRef.current = updatedAnnotations;
@@ -180,7 +191,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         saveAnnotationsToFile(updatedAnnotations);
       }, AUTO_SAVE_DELAY);
     },
-    [saveAnnotationsToFile]
+    [saveAnnotationsToFile],
   );
 
   // Handle notes change with debounced auto-save
@@ -203,7 +214,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         saveNotes(newNotes);
       }, AUTO_SAVE_DELAY);
     },
-    [saveNotes, initialNotes]
+    [saveNotes, initialNotes],
   );
 
   // Cleanup timeout on unmount and save any pending changes
@@ -221,7 +232,9 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         writeTextFile(notesPath, currentNotesRef.current).catch(console.error);
       }
       if (annotationsModifiedRef.current) {
-        saveAnnotations(paper.path, currentAnnotationsRef.current).catch(console.error);
+        saveAnnotations(paper.path, currentAnnotationsRef.current).catch(
+          console.error,
+        );
       }
     };
   }, [paper.path]);

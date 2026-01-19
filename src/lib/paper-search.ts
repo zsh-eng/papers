@@ -62,7 +62,7 @@ export interface ListAllItemsResult {
  * - Collects markdown files from regular folders only
  */
 export async function listAllItems(
-  workspacePath: string
+  workspacePath: string,
 ): Promise<ListAllItemsResult> {
   const papersDir = getPapersDir(workspacePath);
 
@@ -103,7 +103,7 @@ export async function listAllItems(
  * @deprecated Use listAllItems instead to get both papers and markdown files
  */
 export async function listAllPapers(
-  workspacePath: string
+  workspacePath: string,
 ): Promise<PaperSearchItem[]> {
   const result = await listAllItems(workspacePath);
   return result.papers;
@@ -116,7 +116,7 @@ async function collectItemsRecursive(
   currentPath: string,
   relativePath: string,
   papers: PaperSearchItem[],
-  markdowns: MarkdownSearchItem[]
+  markdowns: MarkdownSearchItem[],
 ): Promise<void> {
   try {
     const entries = await readDir(currentPath);
@@ -145,7 +145,7 @@ async function collectItemsRecursive(
             entryPath,
             entryRelativePath,
             papers,
-            markdowns
+            markdowns,
           );
         }
       } else if (entry.isFile && entry.name.endsWith(".md")) {
@@ -188,7 +188,7 @@ function paperToSearchItem(paper: Paper, folderPath: string): PaperSearchItem {
  */
 function markdownToSearchItem(
   markdown: MarkdownFile,
-  folderPath: string
+  folderPath: string,
 ): MarkdownSearchItem {
   // Display path shows the folder hierarchy, e.g., "/ML/notes"
   // Root level markdowns show just "/"

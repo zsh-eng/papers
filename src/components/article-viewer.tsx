@@ -167,7 +167,7 @@ export function ArticleViewer({
       }
       setToolbar(null);
     },
-    [toolbar, onAnnotationCreate]
+    [toolbar, onAnnotationCreate],
   );
 
   // Handle annotation deletion
@@ -239,7 +239,7 @@ export function ArticleViewer({
                 onClick={() => handleColorSelect(name)}
                 className={cn(
                   "w-6 h-6 rounded-md border border-border/50 transition-transform hover:scale-110",
-                  HIGHLIGHT_COLOR_CLASSES[name]
+                  HIGHLIGHT_COLOR_CLASSES[name],
                 )}
                 title={`Highlight ${name}`}
               />

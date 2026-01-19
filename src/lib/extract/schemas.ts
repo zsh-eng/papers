@@ -56,10 +56,7 @@ export const metadataResponseSchema = z.object({
   pages: z.string().nullable().describe("Page range (e.g., '123-145')"),
 
   // Book/chapter fields
-  bookTitle: z
-    .string()
-    .nullable()
-    .describe("Parent book title for chapters"),
+  bookTitle: z.string().nullable().describe("Parent book title for chapters"),
   publisher: z.string().nullable().describe("Publisher name"),
   edition: z.string().nullable().describe("Edition (e.g., '2nd')"),
   editors: z
@@ -68,17 +65,11 @@ export const metadataResponseSchema = z.object({
     .describe("Editors for edited volumes"),
 
   // Conference fields
-  conference: z
-    .string()
-    .nullable()
-    .describe("Conference or venue name"),
+  conference: z.string().nullable().describe("Conference or venue name"),
 
   // Content
   abstract: z.string().nullable().describe("Abstract or summary text"),
-  keywords: z
-    .array(z.string())
-    .nullable()
-    .describe("Keywords or tags"),
+  keywords: z.array(z.string()).nullable().describe("Keywords or tags"),
 
   // Figures
   figures: z

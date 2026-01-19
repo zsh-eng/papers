@@ -11,7 +11,9 @@ const ANNOTATIONS_FILENAME = "annotations.json";
  * Load annotations from a paper's annotations.json file.
  * Returns an empty array if the file doesn't exist.
  */
-export async function loadAnnotations(paperPath: string): Promise<Annotation[]> {
+export async function loadAnnotations(
+  paperPath: string,
+): Promise<Annotation[]> {
   const filePath = `${paperPath}/${ANNOTATIONS_FILENAME}`;
 
   try {
@@ -21,7 +23,7 @@ export async function loadAnnotations(paperPath: string): Promise<Annotation[]> 
     // Validate version for future migrations
     if (data.version !== ANNOTATIONS_SCHEMA_VERSION) {
       console.warn(
-        `Annotations file version ${data.version} differs from current ${ANNOTATIONS_SCHEMA_VERSION}`
+        `Annotations file version ${data.version} differs from current ${ANNOTATIONS_SCHEMA_VERSION}`,
       );
     }
 
@@ -37,7 +39,7 @@ export async function loadAnnotations(paperPath: string): Promise<Annotation[]> 
  */
 export async function saveAnnotations(
   paperPath: string,
-  annotations: Annotation[]
+  annotations: Annotation[],
 ): Promise<void> {
   const filePath = `${paperPath}/${ANNOTATIONS_FILENAME}`;
 

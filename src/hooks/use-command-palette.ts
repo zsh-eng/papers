@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 /**
  * Hook for managing command palette state and keyboard shortcut.
- * 
+ *
  * Shortcuts:
  * - Cmd/Ctrl + P: Open command palette
  */
