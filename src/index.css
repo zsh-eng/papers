@@ -143,6 +143,14 @@
     }
 }
 
+/* Disable transitions for background webviews receiving theme broadcasts */
+html.no-transition,
+html.no-transition body,
+.no-transition,
+.no-transition * {
+    transition: none !important;
+}
+
 /* Custom titlebar for Tauri - macOS overlay style */
 :root {
     --titlebar-height: 34px;

@@ -8,6 +8,9 @@ const STORE_KEY = "theme";
 
 let storePromise: ReturnType<typeof load> | null = null;
 
+// Tracks whether the theme change originated from this webview
+let isLocalMutation = false;
+
 function getStore() {
   if (!storePromise) {
     storePromise = load("settings.json", { autoSave: true, defaults: {} });
@@ -45,6 +48,7 @@ export function useToggleThemeMutation() {
 
   return useMutation({
     mutationFn: async (newTheme: Theme) => {
+      isLocalMutation = true;
       const store = await getStore();
       await store.set(STORE_KEY, newTheme);
     },
@@ -72,11 +76,28 @@ export function useDarkMode() {
     if (isLoading) return;
 
     const root = document.documentElement;
+
+    // If this change came from another webview (broadcast), skip transitions
+    if (!isLocalMutation) {
+      root.classList.add("no-transition");
+      // Force reflow to ensure the class is applied before toggling theme
+      void root.offsetHeight;
+    }
+
     if (isDark) {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
     }
+
+    // Remove no-transition class and reset flag
+    if (!isLocalMutation) {
+      // Use requestAnimationFrame to ensure the theme change is painted first
+      requestAnimationFrame(() => {
+        root.classList.remove("no-transition");
+      });
+    }
+    isLocalMutation = false;
   }, [isDark, isLoading]);
 
   const toggle = useMemo(
