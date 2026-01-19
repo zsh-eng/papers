@@ -184,6 +184,7 @@ export function CommandPalette({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
         if (selectedItem) {
           handleSelect(selectedItem, e);
         }
