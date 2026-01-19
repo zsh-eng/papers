@@ -1,0 +1,5 @@
+# Build outputs
+dist
+
+# Tauri target directory
+src-tauri/target
