@@ -1,9 +1,7 @@
 import { ArticleViewer } from "@/components/article-viewer";
-import { renderMarkdownBody } from "@/lib/extract/render";
-import { extractAuthor, parseMarkdown } from "@/lib/markdown";
+import { useMarkdownContentQuery } from "@/hooks/use-markdown-content";
 import type { MarkdownFile } from "@/lib/papers";
-import { readTextFile } from "@tauri-apps/plugin-fs";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface MarkdownReaderProps {
   markdown: MarkdownFile;
@@ -11,36 +9,19 @@ interface MarkdownReaderProps {
 }
 
 export function MarkdownReader({ markdown, onBack }: MarkdownReaderProps) {
-  const [html, setHtml] = useState<string>("");
-  const [author, setAuthor] = useState<string | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: content,
+    isLoading,
+    error: queryError,
+  } = useMarkdownContentQuery(markdown.path);
 
-  // Load and render markdown content
-  useEffect(() => {
-    async function loadContent() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const content = await readTextFile(markdown.path);
-        const parsed = parseMarkdown(content);
+  const [dismissedError, setDismissedError] = useState(false);
 
-        // Extract author from frontmatter
-        const parsedAuthor = extractAuthor(parsed);
-        setAuthor(parsedAuthor);
-
-        // Render markdown body (strips frontmatter and first H1)
-        const renderedHtml = await renderMarkdownBody(content);
-        setHtml(renderedHtml);
-      } catch (err) {
-        console.error("Failed to load markdown:", err);
-        setError("Failed to load markdown file.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadContent();
-  }, [markdown.path]);
+  // Derive error from query error
+  const error = useMemo(() => {
+    if (dismissedError) return null;
+    return queryError ? "Failed to load markdown file." : null;
+  }, [queryError, dismissedError]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -70,7 +51,7 @@ export function MarkdownReader({ markdown, onBack }: MarkdownReaderProps) {
         <div className="fixed top-0 left-0 right-0 z-30 px-4 py-2 bg-destructive/10 text-destructive text-sm">
           {error}
           <button
-            onClick={() => setError(null)}
+            onClick={() => setDismissedError(true)}
             className="ml-2 underline hover:no-underline"
           >
             Dismiss
@@ -79,15 +60,15 @@ export function MarkdownReader({ markdown, onBack }: MarkdownReaderProps) {
       )}
 
       {/* Main content */}
-      {!isLoading && (
+      {!isLoading && content && (
         <div
           className="fixed top-0 bottom-0 left-0 right-0 overflow-auto"
           style={{ paddingTop: "3rem" }}
         >
           <ArticleViewer
-            html={html}
+            html={content.html}
             title={markdown.metadata.title}
-            authors={author ? [author] : undefined}
+            authors={content.author ? [content.author] : undefined}
             className="pb-32 px-6 paper-scroll-container"
           />
         </div>

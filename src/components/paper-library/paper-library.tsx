@@ -6,7 +6,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { useDarkMode } from "@/hooks/use-dark-mode";
+import { useDarkMode } from "@/hooks/use-theme";
 import { usePaperLibrary } from "@/hooks/use-paper-library";
 import type { MarkdownFile, Paper } from "@/lib/papers";
 import { useEffect, useState } from "react";

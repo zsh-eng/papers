@@ -2,18 +2,22 @@ import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor } from "@/components/notes-editor";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { ViewModeToggle, type ViewMode } from "@/components/view-mode-toggle";
+import { useAnnotationsQuery, useSaveAnnotationsMutation } from "@/hooks/use-annotations";
+import {
+  usePaperHtmlQuery,
+  usePaperNotesQuery,
+  useSaveNotesMutation,
+} from "@/hooks/use-paper-content";
 import {
   generateAnnotationId,
-  loadAnnotations,
   saveAnnotations,
   type Annotation,
   type AnnotationColor,
   type TextPosition,
 } from "@/lib/annotations";
-import { transformImageSources } from "@/lib/html";
 import type { Paper } from "@/lib/papers";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface PaperReaderProps {
   paper: Paper;
@@ -24,16 +28,36 @@ interface PaperReaderProps {
 const AUTO_SAVE_DELAY = 1500;
 
 export function PaperReader({ paper, onBack }: PaperReaderProps) {
-  const [html, setHtml] = useState<string>("");
-  const [initialNotes, setInitialNotes] = useState<string | null>(null);
-  const [isLoadingContent, setIsLoadingContent] = useState(true);
-  const [isLoadingNotes, setIsLoadingNotes] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [dismissedHtmlError, setDismissedHtmlError] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("md");
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+
+  // Query hooks
+  const { data: html, isLoading: isLoadingHtml, error: htmlError } = usePaperHtmlQuery(paper);
+  const { data: initialNotes, isLoading: isLoadingNotes } = usePaperNotesQuery(
+    paper.path,
+    paper.metadata.title
+  );
+  const { data: loadedAnnotations, isLoading: isLoadingAnnotations } = useAnnotationsQuery(
+    paper.path
+  );
+
+  // Derive error from query errors and action errors
+  const error = useMemo(() => {
+    if (actionError) return actionError;
+    if (htmlError && !dismissedHtmlError) {
+      return "Content not available. The paper may not have been fully processed.";
+    }
+    return null;
+  }, [actionError, htmlError, dismissedHtmlError]);
+
+  // Mutation hooks
+  const saveNotesMutation = useSaveNotesMutation();
+  const saveAnnotationsMutation = useSaveAnnotationsMutation();
 
   // Ref to track pending save timeout
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,73 +66,26 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   // Ref to track current notes value (not state to avoid re-renders)
   const currentNotesRef = useRef<string>("");
   // Ref to track pending annotation save timeout
-  const annotationSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const annotationSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref to track if annotations have been modified
   const annotationsModifiedRef = useRef(false);
   // Ref to track current annotations value
   const currentAnnotationsRef = useRef<Annotation[]>([]);
 
-  // Load content.html directly
+  // Sync loaded annotations to local state
   useEffect(() => {
-    async function loadContent() {
-      setIsLoadingContent(true);
-      setError(null);
-      try {
-        const htmlContent = await readTextFile(paper.htmlPath);
-        const transformedHtml = transformImageSources(htmlContent, paper.path);
-        console.log(
-          "Setting HTML, first img src:",
-          transformedHtml.match(/src="([^"]+)"/)?.[1],
-        );
-        setHtml(transformedHtml);
-      } catch (err) {
-        console.error("Failed to load content:", err);
-        setError(
-          "Content not available. The paper may not have been fully processed.",
-        );
-      } finally {
-        setIsLoadingContent(false);
-      }
+    if (loadedAnnotations) {
+      setAnnotations(loadedAnnotations);
+      currentAnnotationsRef.current = loadedAnnotations;
     }
-    loadContent();
-  }, [paper.htmlPath, paper.path]);
+  }, [loadedAnnotations]);
 
-  // Load notes.md
+  // Sync initial notes to ref
   useEffect(() => {
-    async function loadNotes() {
-      setIsLoadingNotes(true);
-      try {
-        const notesPath = `${paper.path}/notes.md`;
-        const text = await readTextFile(notesPath);
-        setInitialNotes(text);
-        currentNotesRef.current = text;
-      } catch {
-        // Notes file might not exist yet
-        const defaultNotes = `# Notes: ${paper.metadata.title}\n\n*Add your notes about this paper here.*\n`;
-        setInitialNotes(defaultNotes);
-        currentNotesRef.current = defaultNotes;
-      } finally {
-        setIsLoadingNotes(false);
-      }
+    if (initialNotes) {
+      currentNotesRef.current = initialNotes;
     }
-    loadNotes();
-  }, [paper.path, paper.metadata.title]);
-
-  // Load annotations
-  useEffect(() => {
-    async function loadAnnotationsFromFile() {
-      try {
-        const loadedAnnotations = await loadAnnotations(paper.path);
-        setAnnotations(loadedAnnotations);
-        currentAnnotationsRef.current = loadedAnnotations;
-      } catch (err) {
-        console.error("Failed to load annotations:", err);
-      }
-    }
-    loadAnnotationsFromFile();
-  }, [paper.path]);
+  }, [initialNotes]);
 
   // Save notes to file
   const saveNotes = useCallback(
@@ -117,18 +94,20 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
 
       setIsSaving(true);
       try {
-        const notesPath = `${paper.path}/notes.md`;
-        await writeTextFile(notesPath, notesContent);
+        await saveNotesMutation.mutateAsync({
+          paperPath: paper.path,
+          content: notesContent,
+        });
         setLastSaved(new Date());
         notesModifiedRef.current = false;
       } catch (err) {
         console.error("Failed to save notes:", err);
-        setError("Failed to save notes");
+        setActionError("Failed to save notes");
       } finally {
         setIsSaving(false);
       }
     },
-    [paper.path],
+    [paper.path, saveNotesMutation]
   );
 
   // Save annotations to file
@@ -138,17 +117,20 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
 
       setIsSaving(true);
       try {
-        await saveAnnotations(paper.path, annotationsToSave);
+        await saveAnnotationsMutation.mutateAsync({
+          paperPath: paper.path,
+          annotations: annotationsToSave,
+        });
         setLastSaved(new Date());
         annotationsModifiedRef.current = false;
       } catch (err) {
         console.error("Failed to save annotations:", err);
-        setError("Failed to save annotations");
+        setActionError("Failed to save annotations");
       } finally {
         setIsSaving(false);
       }
     },
-    [paper.path],
+    [paper.path, saveAnnotationsMutation]
   );
 
   // Handle creating a new annotation
@@ -164,10 +146,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         position,
       };
 
-      const updatedAnnotations = [
-        ...currentAnnotationsRef.current,
-        newAnnotation,
-      ];
+      const updatedAnnotations = [...currentAnnotationsRef.current, newAnnotation];
       setAnnotations(updatedAnnotations);
       currentAnnotationsRef.current = updatedAnnotations;
       annotationsModifiedRef.current = true;
@@ -180,14 +159,14 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         saveAnnotationsToFile(updatedAnnotations);
       }, AUTO_SAVE_DELAY);
     },
-    [saveAnnotationsToFile],
+    [saveAnnotationsToFile]
   );
 
   // Handle deleting an annotation
   const handleAnnotationDelete = useCallback(
     (id: string) => {
       const updatedAnnotations = currentAnnotationsRef.current.filter(
-        (ann) => ann.id !== id,
+        (ann) => ann.id !== id
       );
       setAnnotations(updatedAnnotations);
       currentAnnotationsRef.current = updatedAnnotations;
@@ -201,7 +180,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         saveAnnotationsToFile(updatedAnnotations);
       }, AUTO_SAVE_DELAY);
     },
-    [saveAnnotationsToFile],
+    [saveAnnotationsToFile]
   );
 
   // Handle notes change with debounced auto-save
@@ -224,7 +203,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         saveNotes(newNotes);
       }, AUTO_SAVE_DELAY);
     },
-    [saveNotes, initialNotes],
+    [saveNotes, initialNotes]
   );
 
   // Cleanup timeout on unmount and save any pending changes
@@ -236,15 +215,13 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       if (annotationSaveTimeoutRef.current) {
         clearTimeout(annotationSaveTimeoutRef.current);
       }
-      // Save on unmount if modified
+      // Save on unmount if modified (using direct writes for unmount to avoid async issues)
       if (notesModifiedRef.current) {
         const notesPath = `${paper.path}/notes.md`;
         writeTextFile(notesPath, currentNotesRef.current).catch(console.error);
       }
       if (annotationsModifiedRef.current) {
-        saveAnnotations(paper.path, currentAnnotationsRef.current).catch(
-          console.error,
-        );
+        saveAnnotations(paper.path, currentAnnotationsRef.current).catch(console.error);
       }
     };
   }, [paper.path]);
@@ -283,7 +260,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onBack]);
 
-  const isLoading = isLoadingContent || isLoadingNotes;
+  const isLoading = isLoadingHtml || isLoadingNotes || isLoadingAnnotations;
 
   return (
     <div className="min-h-screen bg-background">
@@ -305,7 +282,10 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         <div className="fixed top-0 left-0 right-0 z-30 px-4 py-2 bg-destructive/10 text-destructive text-sm">
           {error}
           <button
-            onClick={() => setError(null)}
+            onClick={() => {
+              setActionError(null);
+              setDismissedHtmlError(true);
+            }}
             className="ml-2 underline hover:no-underline"
           >
             Dismiss
@@ -326,7 +306,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
           >
             {viewMode === "md" ? (
               <ArticleViewer
-                html={html}
+                html={html || ""}
                 title={paper.metadata.title}
                 authors={paper.metadata.authors}
                 className="pb-32 px-6 paper-scroll-container"
@@ -340,7 +320,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
           </div>
 
           {/* Notes sidebar with its own scroll container */}
-          {initialNotes !== null && (
+          {initialNotes !== undefined && (
             <div
               className={`fixed top-0 right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col ${!notesOpen ? "hidden" : ""}`}
             >

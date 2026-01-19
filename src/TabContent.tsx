@@ -4,6 +4,7 @@ import { PaperLibrary } from "@/components/paper-library";
 import { PaperReader } from "@/components/paper-reader";
 import { useCommandPalette } from "@/hooks/use-command-palette";
 import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useQuerySync } from "@/hooks/use-query-sync";
 import { useWorkspace } from "@/hooks/use-workspace";
 import type { MarkdownFile, Paper } from "@/lib/papers";
 import { loadPaper, loadMarkdownFile } from "@/lib/papers";
@@ -20,6 +21,9 @@ export function TabContent() {
   const paperPath = params.get("path");
 
   const { workspacePath, isLoading: isWorkspaceLoading } = useWorkspace();
+
+  // Set up cross-webview query synchronization
+  useQuerySync();
 
   // Register tab keyboard shortcuts (shared hook, calls Rust directly)
   useTabKeyboardShortcuts();

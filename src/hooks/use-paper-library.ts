@@ -4,6 +4,8 @@ import { getPapersDir, type LibraryItem } from "@/lib/papers";
 import { useLibraryItemsQuery } from "@/hooks/use-papers-query";
 import { createFolder, deleteItem, pathExists } from "@/lib/fs";
 import { mkdir } from "@tauri-apps/plugin-fs";
+import { broadcastInvalidation } from "@/lib/query-invalidation";
+import { queryKeys } from "@/lib/query-keys";
 
 export interface Breadcrumb {
   name: string;
@@ -121,9 +123,9 @@ export function usePaperLibrary(
         }
         await createFolder(effectiveCurrentPath, name);
         // Invalidate the query to refetch
-        queryClient.invalidateQueries({
-          queryKey: ["libraryItems", effectiveCurrentPath],
-        });
+        const queryKey = queryKeys.libraryItems(effectiveCurrentPath);
+        queryClient.invalidateQueries({ queryKey });
+        broadcastInvalidation(queryKey);
       } catch (err) {
         setActionError(
           err instanceof Error ? err.message : "Failed to create folder",
@@ -145,9 +147,9 @@ export function usePaperLibrary(
       try {
         await deleteItem(path);
         // Invalidate the query to refetch
-        queryClient.invalidateQueries({
-          queryKey: ["libraryItems", effectiveCurrentPath],
-        });
+        const queryKey = queryKeys.libraryItems(effectiveCurrentPath);
+        queryClient.invalidateQueries({ queryKey });
+        broadcastInvalidation(queryKey);
       } catch (err) {
         setActionError(
           err instanceof Error ? err.message : "Failed to delete item",
