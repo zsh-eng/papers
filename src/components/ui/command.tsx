@@ -42,6 +42,8 @@ function CommandDialog({
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // There is an "Escape" keyboard shortcut also registered in
+        e.stopPropagation();
         onOpenChange?.(false);
       }
     };
