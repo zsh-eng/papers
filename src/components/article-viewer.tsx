@@ -1,5 +1,4 @@
 import {
-  HIGHLIGHT_COLORS,
   isHtmlAnnotation,
   type Annotation,
   type AnnotationColor,
@@ -13,6 +12,7 @@ import {
 import type { SyncableHighlight } from "@zsh-eng/text-highlighter/react";
 import { useHighlighter } from "@zsh-eng/text-highlighter/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HighlightToolbar } from "./highlight-toolbar";
 
 interface ArticleViewerProps {
   /** Pre-rendered HTML content */
@@ -36,15 +36,6 @@ interface ToolbarState {
   mode: "create" | "edit";
   annotationId?: string;
 }
-
-// Mapping of color names to CSS classes (used by toolbar)
-const HIGHLIGHT_COLOR_CLASSES: Record<AnnotationColor, string> = {
-  yellow: "bg-yellow-200/70 dark:bg-yellow-500/40",
-  green: "bg-green-200/70 dark:bg-green-500/40",
-  blue: "bg-blue-200/70 dark:bg-blue-500/40",
-  magenta: "bg-pink-200/70 dark:bg-pink-500/40",
-  invisible: "",
-};
 
 // Extend SyncableHighlight with color field
 interface AnnotationHighlight extends SyncableHighlight {
@@ -119,13 +110,20 @@ export function ArticleViewer({
     getAttributes: (h) => ({
       "data-color": h.color,
     }),
-    onHighlightClick: (id, position) => {
-      setToolbar({
-        x: position.x,
-        y: position.y - 8,
-        mode: "edit",
-        annotationId: id,
-      });
+    onHighlightClick: (id) => {
+      // Find the highlight element to position toolbar above it
+      const highlightEl = contentRef.current?.querySelector(
+        `[data-highlight-id="${id}"]`,
+      );
+      if (highlightEl) {
+        const rect = highlightEl.getBoundingClientRect();
+        setToolbar({
+          x: rect.left + rect.width / 2,
+          y: rect.top,
+          mode: "edit",
+          annotationId: id,
+        });
+      }
     },
   });
 
@@ -171,48 +169,41 @@ export function ArticleViewer({
     });
   }, []);
 
-  // Handle color selection
+  // Get current annotation color for edit mode
+  const currentAnnotationColor = useMemo(() => {
+    if (toolbar?.mode !== "edit" || !toolbar.annotationId) return null;
+    const annotation = annotations.find((a) => a.id === toolbar.annotationId);
+    return annotation?.color ?? null;
+  }, [toolbar, annotations]);
+
+  // Handle color selection (create or edit)
   const handleColorSelect = useCallback(
     (color: AnnotationColor) => {
       if (toolbar?.mode === "create" && pendingSelectionRef.current) {
+        // Create new annotation
         onAnnotationCreate?.(pendingSelectionRef.current, color);
         pendingSelectionRef.current = null;
         window.getSelection()?.removeAllRanges();
+      } else if (toolbar?.mode === "edit" && toolbar.annotationId) {
+        // Edit mode: same color = delete, different color = change
+        if (color === currentAnnotationColor) {
+          onAnnotationDelete?.(toolbar.annotationId);
+        } else {
+          // TODO: Add onAnnotationUpdate callback for color change
+          // For now, delete and recreate would lose position data
+          // so we just close the toolbar
+        }
       }
       setToolbar(null);
     },
-    [toolbar, onAnnotationCreate],
+    [toolbar, currentAnnotationColor, onAnnotationCreate, onAnnotationDelete],
   );
 
-  // Handle annotation deletion
-  const handleDelete = useCallback(() => {
-    if (toolbar?.mode === "edit" && toolbar.annotationId) {
-      onAnnotationDelete?.(toolbar.annotationId);
-    }
+  // Handle toolbar close
+  const handleToolbarClose = useCallback(() => {
     setToolbar(null);
-  }, [toolbar, onAnnotationDelete]);
-
-  // Close toolbar when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest("[data-annotation-toolbar]")) {
-        setToolbar(null);
-        pendingSelectionRef.current = null;
-      }
-    };
-
-    if (toolbar) {
-      // Use setTimeout to avoid immediately closing when opening
-      const timeout = setTimeout(() => {
-        document.addEventListener("click", handleClickOutside);
-      }, 0);
-      return () => {
-        clearTimeout(timeout);
-        document.removeEventListener("click", handleClickOutside);
-      };
-    }
-  }, [toolbar]);
+    pendingSelectionRef.current = null;
+  }, []);
 
   return (
     <div className={cn(className)}>
@@ -235,39 +226,12 @@ export function ArticleViewer({
 
       {/* Annotation toolbar */}
       {toolbar && (
-        <div
-          data-annotation-toolbar
-          className="fixed z-50 flex items-center gap-1 p-1.5 bg-popover border border-border rounded-lg shadow-lg"
-          style={{
-            left: toolbar.x,
-            top: toolbar.y,
-            transform: "translate(-50%, -100%)",
-          }}
-        >
-          {toolbar.mode === "create" ? (
-            // Color selection buttons
-            HIGHLIGHT_COLORS.map(({ name }) => (
-              <button
-                key={name}
-                onClick={() => handleColorSelect(name)}
-                className={cn(
-                  "w-6 h-6 rounded-md border border-border/50 transition-transform hover:scale-110",
-                  HIGHLIGHT_COLOR_CLASSES[name],
-                )}
-                title={`Highlight ${name}`}
-              />
-            ))
-          ) : (
-            // Edit mode - show delete button
-            <button
-              onClick={handleDelete}
-              className="px-2 py-1 text-xs text-destructive hover:bg-destructive/10 rounded"
-              title="Remove highlight"
-            >
-              Remove
-            </button>
-          )}
-        </div>
+        <HighlightToolbar
+          position={{ x: toolbar.x, y: toolbar.y }}
+          onColorSelect={handleColorSelect}
+          onClose={handleToolbarClose}
+          currentColor={currentAnnotationColor}
+        />
       )}
     </div>
   );
