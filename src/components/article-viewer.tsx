@@ -9,10 +9,10 @@ import {
 import {
   createHighlightFromSelection,
   getSelectionPosition,
-  applyHighlight,
-  removeHighlightById,
 } from "@zsh-eng/text-highlighter";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useHighlighter } from "@zsh-eng/text-highlighter/react";
+import type { SyncableHighlight } from "@zsh-eng/text-highlighter/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface ArticleViewerProps {
   /** Pre-rendered HTML content */
@@ -37,7 +37,7 @@ interface ToolbarState {
   annotationId?: string;
 }
 
-// Mapping of color names to CSS classes
+// Mapping of color names to CSS classes (used by toolbar)
 const HIGHLIGHT_COLOR_CLASSES: Record<AnnotationColor, string> = {
   yellow: "bg-yellow-200/70 dark:bg-yellow-500/40",
   green: "bg-green-200/70 dark:bg-green-500/40",
@@ -45,6 +45,11 @@ const HIGHLIGHT_COLOR_CLASSES: Record<AnnotationColor, string> = {
   magenta: "bg-pink-200/70 dark:bg-pink-500/40",
   invisible: "",
 };
+
+// Extend SyncableHighlight with color field
+interface AnnotationHighlight extends SyncableHighlight {
+  color: AnnotationColor;
+}
 
 /**
  * A pure HTML renderer for articles/papers with annotation support.
@@ -63,62 +68,47 @@ export function ArticleViewer({
   const [toolbar, setToolbar] = useState<ToolbarState | null>(null);
   const pendingSelectionRef = useRef<TextPosition | null>(null);
 
-  // Apply highlights when annotations change or content loads
-  useEffect(() => {
-    const container = contentRef.current;
-    if (!container) return;
+  // Transform annotations to SyncableHighlight format for the hook
+  const syncableHighlights = useMemo<AnnotationHighlight[]>(
+    () =>
+      annotations
+        .filter(isHtmlAnnotation)
+        .filter((a) => a.color !== "invisible")
+        .map((ann) => ({
+          id: ann.id,
+          startOffset: ann.position.startOffset,
+          endOffset: ann.position.endOffset,
+          selectedText: ann.position.selectedText,
+          color: ann.color,
+        })),
+    [annotations],
+  );
 
-    // Filter to HTML annotations only
-    const htmlAnnotations = annotations.filter(isHtmlAnnotation);
-
-    // Remove all existing highlights first
-    const existingMarks = container.querySelectorAll("[data-highlight-id]");
-    existingMarks.forEach((mark) => {
-      const id = mark.getAttribute("data-highlight-id");
-      if (id) {
-        removeHighlightById(container, id);
-      }
-    });
-
-    // Apply each annotation
-    htmlAnnotations.forEach((ann) => {
-      const colorClass = HIGHLIGHT_COLOR_CLASSES[ann.color];
-      if (ann.color === "invisible") return; // Don't render invisible highlights
-
-      applyHighlight(container, ann.position, {
-        tagName: "mark",
-        className: `${colorClass} rounded-sm cursor-pointer transition-colors`,
-        attributes: {
-          "data-highlight-id": ann.id,
-        },
+  // Use the declarative highlighter hook
+  const { setActiveHighlight } = useHighlighter({
+    containerRef: contentRef,
+    highlights: syncableHighlights,
+    contentReady: Boolean(html),
+    className: "annotation-highlight",
+    hoverClass: "annotation-highlight-hover",
+    activeClass: "annotation-highlight-active",
+    getAttributes: (h) => ({
+      "data-color": h.color,
+    }),
+    onHighlightClick: (id, position) => {
+      setToolbar({
+        x: position.x,
+        y: position.y - 8,
+        mode: "edit",
+        annotationId: id,
       });
-    });
+    },
+  });
 
-    // Add click handlers for highlights
-    const handleHighlightClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const mark = target.closest("[data-highlight-id]");
-      if (mark) {
-        const id = mark.getAttribute("data-highlight-id");
-        if (id) {
-          const rect = mark.getBoundingClientRect();
-          setToolbar({
-            x: rect.left + rect.width / 2,
-            y: rect.top - 8,
-            mode: "edit",
-            annotationId: id,
-          });
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      }
-    };
-
-    container.addEventListener("click", handleHighlightClick);
-    return () => {
-      container.removeEventListener("click", handleHighlightClick);
-    };
-  }, [annotations, html]);
+  // Sync active state with toolbar
+  useEffect(() => {
+    setActiveHighlight(toolbar?.annotationId ?? null);
+  }, [toolbar?.annotationId, setActiveHighlight]);
 
   // Handle text selection
   const handleMouseUp = useCallback(() => {
