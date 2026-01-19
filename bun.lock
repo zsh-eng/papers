@@ -24,6 +24,7 @@
         "@tauri-apps/plugin-fs": "^2.4.5",
         "@tauri-apps/plugin-opener": "^2.5.3",
         "@tauri-apps/plugin-store": "~2",
+        "@zsh-eng/text-highlighter": "^0.1.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
@@ -591,6 +592,8 @@
     "@vitest/spy": ["@vitest/spy@4.0.17", "", {}, "sha512-I1bQo8QaP6tZlTomQNWKJE6ym4SHf3oLS7ceNjozxxgzavRAgZDc06T7kD8gb9bXKEgcLNt00Z+kZO6KaJ62Ew=="],
 
     "@vitest/utils": ["@vitest/utils@4.0.17", "", { "dependencies": { "@vitest/pretty-format": "4.0.17", "tinyrainbow": "^3.0.3" } }, "sha512-RG6iy+IzQpa9SB8HAFHJ9Y+pTzI+h8553MrciN9eC6TFBErqrQaTas4vG+MVj8S4uKk8uTT2p0vgZPnTdxd96w=="],
+
+    "@zsh-eng/text-highlighter": ["@zsh-eng/text-highlighter@0.1.0", "", { "peerDependencies": { "typescript": ">=5.0.0" } }, "sha512-tHCMjGp1awfWxKWymP0tCBUE86QBpOZfzXl9KB03E/UARYBUhSoB89xdbY7ip9SLh2cQzWIT+vhoxz+e/2Y8eA=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 

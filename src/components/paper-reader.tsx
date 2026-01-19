@@ -2,9 +2,17 @@ import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor } from "@/components/notes-editor";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { ViewModeToggle, type ViewMode } from "@/components/view-mode-toggle";
+import {
+  generateAnnotationId,
+  loadAnnotations,
+  saveAnnotations,
+  type Annotation,
+  type AnnotationColor,
+  type TextPosition,
+} from "@/lib/annotations";
+import { transformImageSources } from "@/lib/html";
 import type { Paper } from "@/lib/papers";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { transformImageSources } from "@/lib/html";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface PaperReaderProps {
@@ -25,6 +33,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [error, setError] = useState<string | null>(null);
   const [notesOpen, setNotesOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("md");
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
   // Ref to track pending save timeout
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,6 +41,14 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const notesModifiedRef = useRef(false);
   // Ref to track current notes value (not state to avoid re-renders)
   const currentNotesRef = useRef<string>("");
+  // Ref to track pending annotation save timeout
+  const annotationSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  // Ref to track if annotations have been modified
+  const annotationsModifiedRef = useRef(false);
+  // Ref to track current annotations value
+  const currentAnnotationsRef = useRef<Annotation[]>([]);
 
   // Load content.html directly
   useEffect(() => {
@@ -79,6 +96,20 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     loadNotes();
   }, [paper.path, paper.metadata.title]);
 
+  // Load annotations
+  useEffect(() => {
+    async function loadAnnotationsFromFile() {
+      try {
+        const loadedAnnotations = await loadAnnotations(paper.path);
+        setAnnotations(loadedAnnotations);
+        currentAnnotationsRef.current = loadedAnnotations;
+      } catch (err) {
+        console.error("Failed to load annotations:", err);
+      }
+    }
+    loadAnnotationsFromFile();
+  }, [paper.path]);
+
   // Save notes to file
   const saveNotes = useCallback(
     async (notesContent: string) => {
@@ -98,6 +129,79 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       }
     },
     [paper.path],
+  );
+
+  // Save annotations to file
+  const saveAnnotationsToFile = useCallback(
+    async (annotationsToSave: Annotation[]) => {
+      if (!annotationsModifiedRef.current) return;
+
+      setIsSaving(true);
+      try {
+        await saveAnnotations(paper.path, annotationsToSave);
+        setLastSaved(new Date());
+        annotationsModifiedRef.current = false;
+      } catch (err) {
+        console.error("Failed to save annotations:", err);
+        setError("Failed to save annotations");
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [paper.path],
+  );
+
+  // Handle creating a new annotation
+  const handleAnnotationCreate = useCallback(
+    (position: TextPosition, color: AnnotationColor) => {
+      const now = new Date().toISOString();
+      const newAnnotation: Annotation = {
+        id: generateAnnotationId(),
+        source: "html",
+        color,
+        createdAt: now,
+        updatedAt: now,
+        position,
+      };
+
+      const updatedAnnotations = [
+        ...currentAnnotationsRef.current,
+        newAnnotation,
+      ];
+      setAnnotations(updatedAnnotations);
+      currentAnnotationsRef.current = updatedAnnotations;
+      annotationsModifiedRef.current = true;
+
+      // Clear existing timeout and set new one for auto-save
+      if (annotationSaveTimeoutRef.current) {
+        clearTimeout(annotationSaveTimeoutRef.current);
+      }
+      annotationSaveTimeoutRef.current = setTimeout(() => {
+        saveAnnotationsToFile(updatedAnnotations);
+      }, AUTO_SAVE_DELAY);
+    },
+    [saveAnnotationsToFile],
+  );
+
+  // Handle deleting an annotation
+  const handleAnnotationDelete = useCallback(
+    (id: string) => {
+      const updatedAnnotations = currentAnnotationsRef.current.filter(
+        (ann) => ann.id !== id,
+      );
+      setAnnotations(updatedAnnotations);
+      currentAnnotationsRef.current = updatedAnnotations;
+      annotationsModifiedRef.current = true;
+
+      // Clear existing timeout and set new one for auto-save
+      if (annotationSaveTimeoutRef.current) {
+        clearTimeout(annotationSaveTimeoutRef.current);
+      }
+      annotationSaveTimeoutRef.current = setTimeout(() => {
+        saveAnnotationsToFile(updatedAnnotations);
+      }, AUTO_SAVE_DELAY);
+    },
+    [saveAnnotationsToFile],
   );
 
   // Handle notes change with debounced auto-save
@@ -129,10 +233,18 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
+      if (annotationSaveTimeoutRef.current) {
+        clearTimeout(annotationSaveTimeoutRef.current);
+      }
       // Save on unmount if modified
       if (notesModifiedRef.current) {
         const notesPath = `${paper.path}/notes.md`;
         writeTextFile(notesPath, currentNotesRef.current).catch(console.error);
+      }
+      if (annotationsModifiedRef.current) {
+        saveAnnotations(paper.path, currentAnnotationsRef.current).catch(
+          console.error,
+        );
       }
     };
   }, [paper.path]);
@@ -218,6 +330,9 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
                 title={paper.metadata.title}
                 authors={paper.metadata.authors}
                 className="pb-32 px-6 paper-scroll-container"
+                annotations={annotations}
+                onAnnotationCreate={handleAnnotationCreate}
+                onAnnotationDelete={handleAnnotationDelete}
               />
             ) : (
               <PdfViewer pdfPath={paper.pdfPath} className="h-full" />
