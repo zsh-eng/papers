@@ -28,6 +28,11 @@ interface ArticleViewerProps {
   onAnnotationCreate?: (position: TextPosition, color: AnnotationColor) => void;
   /** Callback when an annotation is deleted */
   onAnnotationDelete?: (id: string) => void;
+  /** Callback when an annotation is updated */
+  onAnnotationUpdate?: (
+    id: string,
+    updates: { color?: AnnotationColor },
+  ) => void;
 }
 
 interface ToolbarState {
@@ -78,6 +83,7 @@ export function ArticleViewer({
   annotations = [],
   onAnnotationCreate,
   onAnnotationDelete,
+  onAnnotationUpdate,
 }: ArticleViewerProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [toolbar, setToolbar] = useState<ToolbarState | null>(null);
@@ -189,14 +195,18 @@ export function ArticleViewer({
         if (color === currentAnnotationColor) {
           onAnnotationDelete?.(toolbar.annotationId);
         } else {
-          // TODO: Add onAnnotationUpdate callback for color change
-          // For now, delete and recreate would lose position data
-          // so we just close the toolbar
+          onAnnotationUpdate?.(toolbar.annotationId, { color });
         }
       }
       setToolbar(null);
     },
-    [toolbar, currentAnnotationColor, onAnnotationCreate, onAnnotationDelete],
+    [
+      toolbar,
+      currentAnnotationColor,
+      onAnnotationCreate,
+      onAnnotationDelete,
+      onAnnotationUpdate,
+    ],
   );
 
   // Handle toolbar close

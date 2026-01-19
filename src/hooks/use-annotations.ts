@@ -216,6 +216,19 @@ export function useAnnotations(paperPath: string) {
     [queryClient, queryKey, scheduleSave],
   );
 
+  // Update annotation handler
+  const updateAnnotation = useCallback(
+    (id: string, updates: Partial<Pick<Annotation, "color" | "note">>) => {
+      const now = new Date().toISOString();
+      const newAnnotations = latestAnnotationsRef.current.map((ann) =>
+        ann.id === id ? { ...ann, ...updates, updatedAt: now } : ann,
+      );
+      queryClient.setQueryData<Annotation[]>(queryKey, newAnnotations);
+      scheduleSave(newAnnotations);
+    },
+    [queryClient, queryKey, scheduleSave],
+  );
+
   // Cleanup on unmount - save any pending changes
   useEffect(() => {
     return () => {
@@ -237,5 +250,6 @@ export function useAnnotations(paperPath: string) {
     error,
     createAnnotation,
     deleteAnnotation,
+    updateAnnotation,
   };
 }

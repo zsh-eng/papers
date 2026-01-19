@@ -45,6 +45,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     isLoading: isLoadingAnnotations,
     createAnnotation: handleAnnotationCreate,
     deleteAnnotation: handleAnnotationDelete,
+    updateAnnotation: handleAnnotationUpdate,
   } = useAnnotations(paper.path);
 
   // Derive error from query errors and action errors
@@ -210,6 +211,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
                 annotations={annotations}
                 onAnnotationCreate={handleAnnotationCreate}
                 onAnnotationDelete={handleAnnotationDelete}
+                onAnnotationUpdate={handleAnnotationUpdate}
               />
             ) : (
               <PdfViewer pdfPath={paper.pdfPath} className="h-full" />
