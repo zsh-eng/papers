@@ -141,9 +141,12 @@ fn create_tab_internal(
     let position = LogicalPosition::new(0.0, TAB_BAR_HEIGHT);
     let webview_size = LogicalSize::new(width, height);
 
-    let _webview = window
+    let webview = window
         .add_child(webview_builder, position, webview_size)
         .map_err(|e| e.to_string())?;
+
+    // Focus the new webview
+    let _ = webview.set_focus();
 
     // Add tab to state
     let tab_info = TabInfo {
@@ -199,9 +202,12 @@ pub fn create_tab(
     let position = LogicalPosition::new(0.0, TAB_BAR_HEIGHT);
     let webview_size = LogicalSize::new(width, height);
 
-    let _webview = window
+    let webview = window
         .add_child(webview_builder, position, webview_size)
         .map_err(|e| e.to_string())?;
+
+    // Focus the new webview
+    let _ = webview.set_focus();
 
     // Add tab to state
     let tab_info = TabInfo {
@@ -253,6 +259,7 @@ pub fn close_tab(app: AppHandle, id: String) -> Result<(), String> {
                 manager.set_active(&new_id);
                 if let Some(webview) = app.get_webview(&new_id) {
                     let _ = webview.show();
+                    let _ = webview.set_focus();
                 }
             }
         }
