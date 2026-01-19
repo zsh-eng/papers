@@ -2,22 +2,12 @@ import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor } from "@/components/notes-editor";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { ViewModeToggle, type ViewMode } from "@/components/view-mode-toggle";
-import {
-  useAnnotationsQuery,
-  useSaveAnnotationsMutation,
-} from "@/hooks/use-annotations";
+import { useAnnotations } from "@/hooks/use-annotations";
 import {
   usePaperHtmlQuery,
   usePaperNotesQuery,
   useSaveNotesMutation,
 } from "@/hooks/use-paper-content";
-import {
-  generateAnnotationId,
-  saveAnnotations,
-  type Annotation,
-  type AnnotationColor,
-  type TextPosition,
-} from "@/lib/annotations";
 import type { Paper } from "@/lib/papers";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -37,7 +27,6 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [dismissedHtmlError, setDismissedHtmlError] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("md");
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
   // Query hooks
   const {
@@ -49,8 +38,14 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     paper.path,
     paper.metadata.title,
   );
-  const { data: loadedAnnotations, isLoading: isLoadingAnnotations } =
-    useAnnotationsQuery(paper.path);
+
+  // Annotations via React Query with optimistic updates
+  const {
+    annotations,
+    isLoading: isLoadingAnnotations,
+    createAnnotation: handleAnnotationCreate,
+    deleteAnnotation: handleAnnotationDelete,
+  } = useAnnotations(paper.path);
 
   // Derive error from query errors and action errors
   const error = useMemo(() => {
@@ -63,7 +58,6 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
 
   // Mutation hooks
   const saveNotesMutation = useSaveNotesMutation();
-  const saveAnnotationsMutation = useSaveAnnotationsMutation();
 
   // Ref to track pending save timeout
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,22 +65,6 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const notesModifiedRef = useRef(false);
   // Ref to track current notes value (not state to avoid re-renders)
   const currentNotesRef = useRef<string>("");
-  // Ref to track pending annotation save timeout
-  const annotationSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  // Ref to track if annotations have been modified
-  const annotationsModifiedRef = useRef(false);
-  // Ref to track current annotations value
-  const currentAnnotationsRef = useRef<Annotation[]>([]);
-
-  // Sync loaded annotations to local state
-  useEffect(() => {
-    if (loadedAnnotations) {
-      setAnnotations(loadedAnnotations);
-      currentAnnotationsRef.current = loadedAnnotations;
-    }
-  }, [loadedAnnotations]);
 
   // Sync initial notes to ref
   useEffect(() => {
@@ -118,82 +96,6 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     [paper.path, saveNotesMutation],
   );
 
-  // Save annotations to file
-  const saveAnnotationsToFile = useCallback(
-    async (annotationsToSave: Annotation[]) => {
-      if (!annotationsModifiedRef.current) return;
-
-      setIsSaving(true);
-      try {
-        await saveAnnotationsMutation.mutateAsync({
-          paperPath: paper.path,
-          annotations: annotationsToSave,
-        });
-        setLastSaved(new Date());
-        annotationsModifiedRef.current = false;
-      } catch (err) {
-        console.error("Failed to save annotations:", err);
-        setActionError("Failed to save annotations");
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [paper.path, saveAnnotationsMutation],
-  );
-
-  // Handle creating a new annotation
-  const handleAnnotationCreate = useCallback(
-    (position: TextPosition, color: AnnotationColor) => {
-      const now = new Date().toISOString();
-      const newAnnotation: Annotation = {
-        id: generateAnnotationId(),
-        source: "html",
-        color,
-        createdAt: now,
-        updatedAt: now,
-        position,
-      };
-
-      const updatedAnnotations = [
-        ...currentAnnotationsRef.current,
-        newAnnotation,
-      ];
-      setAnnotations(updatedAnnotations);
-      currentAnnotationsRef.current = updatedAnnotations;
-      annotationsModifiedRef.current = true;
-
-      // Clear existing timeout and set new one for auto-save
-      if (annotationSaveTimeoutRef.current) {
-        clearTimeout(annotationSaveTimeoutRef.current);
-      }
-      annotationSaveTimeoutRef.current = setTimeout(() => {
-        saveAnnotationsToFile(updatedAnnotations);
-      }, AUTO_SAVE_DELAY);
-    },
-    [saveAnnotationsToFile],
-  );
-
-  // Handle deleting an annotation
-  const handleAnnotationDelete = useCallback(
-    (id: string) => {
-      const updatedAnnotations = currentAnnotationsRef.current.filter(
-        (ann) => ann.id !== id,
-      );
-      setAnnotations(updatedAnnotations);
-      currentAnnotationsRef.current = updatedAnnotations;
-      annotationsModifiedRef.current = true;
-
-      // Clear existing timeout and set new one for auto-save
-      if (annotationSaveTimeoutRef.current) {
-        clearTimeout(annotationSaveTimeoutRef.current);
-      }
-      annotationSaveTimeoutRef.current = setTimeout(() => {
-        saveAnnotationsToFile(updatedAnnotations);
-      }, AUTO_SAVE_DELAY);
-    },
-    [saveAnnotationsToFile],
-  );
-
   // Handle notes change with debounced auto-save
   const handleNotesChange = useCallback(
     (newNotes: string) => {
@@ -223,18 +125,10 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
-      if (annotationSaveTimeoutRef.current) {
-        clearTimeout(annotationSaveTimeoutRef.current);
-      }
       // Save on unmount if modified (using direct writes for unmount to avoid async issues)
       if (notesModifiedRef.current) {
         const notesPath = `${paper.path}/notes.md`;
         writeTextFile(notesPath, currentNotesRef.current).catch(console.error);
-      }
-      if (annotationsModifiedRef.current) {
-        saveAnnotations(paper.path, currentAnnotationsRef.current).catch(
-          console.error,
-        );
       }
     };
   }, [paper.path]);
