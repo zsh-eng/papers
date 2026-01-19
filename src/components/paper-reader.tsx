@@ -279,16 +279,6 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     <div className="min-h-screen bg-background">
       <ViewModeToggle value={viewMode} onChange={setViewMode} />
       {/* Header bar with toggle and save status */}
-      <div className="fixed top-[var(--titlebar-height)] left-0 right-0 z-20 flex items-center justify-between px-4 py-2">
-        {/* Save status indicator */}
-        <div className="text-xs text-muted-foreground/50">
-          {isSaving
-            ? "Saving..."
-            : lastSaved
-              ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-              : null}
-        </div>
-      </div>
 
       {/* Error banner */}
       {error && (
@@ -337,6 +327,16 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
             <div
               className={`fixed top-0 right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col ${!notesOpen ? "hidden" : ""}`}
             >
+              <div className="z-20 flex items-center justify-between px-4 py-2">
+                {/* Save status indicator */}
+                <div className="text-xs text-muted-foreground/50">
+                  {isSaving
+                    ? "Saving..."
+                    : lastSaved
+                      ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                      : null}
+                </div>
+              </div>
               <NotesEditor
                 value={initialNotes}
                 onChange={handleNotesChange}
