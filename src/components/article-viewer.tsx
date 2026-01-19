@@ -1,18 +1,18 @@
-import { cn } from "@/lib/utils";
 import {
-  type AnnotationColor,
-  type TextPosition,
   HIGHLIGHT_COLORS,
   isHtmlAnnotation,
   type Annotation,
+  type AnnotationColor,
+  type TextPosition,
 } from "@/lib/annotations";
+import { cn } from "@/lib/utils";
 import {
   createHighlightFromSelection,
   getSelectionPosition,
 } from "@zsh-eng/text-highlighter";
-import { useHighlighter } from "@zsh-eng/text-highlighter/react";
 import type { SyncableHighlight } from "@zsh-eng/text-highlighter/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useHighlighter } from "@zsh-eng/text-highlighter/react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface ArticleViewerProps {
   /** Pre-rendered HTML content */
@@ -50,6 +50,30 @@ const HIGHLIGHT_COLOR_CLASSES: Record<AnnotationColor, string> = {
 interface AnnotationHighlight extends SyncableHighlight {
   color: AnnotationColor;
 }
+
+/**
+ * Separated content component to isolate re-renders.
+ */
+const ArticleContent = memo(
+  ({
+    html,
+    contentRef,
+    onMouseUp,
+  }: {
+    html: string;
+    contentRef: React.RefObject<HTMLDivElement | null>;
+    onMouseUp: () => void;
+  }) => {
+    return (
+      <div
+        ref={contentRef}
+        className="markdown-content"
+        dangerouslySetInnerHTML={{ __html: html }}
+        onMouseUp={onMouseUp}
+      />
+    );
+  },
+);
 
 /**
  * A pure HTML renderer for articles/papers with annotation support.
@@ -203,10 +227,9 @@ export function ArticleViewer({
       </div>
 
       {/* Paper body */}
-      <div
-        ref={contentRef}
-        className="markdown-content"
-        dangerouslySetInnerHTML={{ __html: html }}
+      <ArticleContent
+        html={html}
+        contentRef={contentRef}
         onMouseUp={handleMouseUp}
       />
 
