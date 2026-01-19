@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { queryClient } from "@/lib/query-client";
 
 /**
  * Hook for handling global keyboard shortcuts for tab management.
@@ -8,6 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
  * Shortcuts:
  * - Cmd/Ctrl + T: New tab
  * - Cmd/Ctrl + W: Close current tab
+ * - Cmd/Ctrl + R: Refresh current tab data (invalidate queries)
  * - Cmd/Ctrl + Tab: Next tab
  * - Cmd/Ctrl + Shift + Tab: Previous tab
  * - Cmd + 1-9: Switch to tab by index
@@ -32,6 +34,13 @@ export function useTabKeyboardShortcuts() {
       if (isMod && e.key === "w") {
         e.preventDefault();
         await invoke("close_active_tab");
+        return;
+      }
+
+      // Cmd/Ctrl + R: Refresh current tab data
+      if (isMod && e.key === "r") {
+        e.preventDefault();
+        queryClient.invalidateQueries();
         return;
       }
 
