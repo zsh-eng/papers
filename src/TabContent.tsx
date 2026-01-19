@@ -10,6 +10,7 @@ import type { MarkdownFile, Paper } from "@/lib/papers";
 import { loadPaper, loadMarkdownFile } from "@/lib/papers";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
+import { useDarkMode } from "./hooks/use-theme";
 
 /**
  * TabContent is rendered inside each child webview.
@@ -24,6 +25,9 @@ export function TabContent() {
 
   // Set up cross-webview query synchronization
   useQuerySync();
+
+  // Subscribe to dark mode changes
+  useDarkMode();
 
   // Register tab keyboard shortcuts (shared hook, calls Rust directly)
   useTabKeyboardShortcuts();
