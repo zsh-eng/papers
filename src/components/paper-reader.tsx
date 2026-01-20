@@ -1,15 +1,14 @@
 import { ArticleViewer } from "@/components/article-viewer";
-import { NotesEditor } from "@/components/notes-editor";
+import { NotesEditor, type NotesEditorHandle } from "@/components/notes-editor";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { ViewModeToggle, type ViewMode } from "@/components/view-mode-toggle";
 import { useAnnotations } from "@/hooks/use-annotations";
-import {
-  usePaperHtmlQuery,
-  usePaperNotesQuery,
-  useSaveNotesMutation,
-} from "@/hooks/use-paper-content";
+import { useNotes } from "@/hooks/use-notes";
+import { usePaperHtmlQuery } from "@/hooks/use-paper-content";
+import { useVisibilityRefetch } from "@/hooks/use-visibility-refetch";
 import type { Paper } from "@/lib/papers";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { queryKeys } from "@/lib/query-keys";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface PaperReaderProps {
@@ -17,16 +16,14 @@ interface PaperReaderProps {
   onBack: () => void;
 }
 
-// Debounce delay for auto-save (ms)
-const AUTO_SAVE_DELAY = 1500;
-
 export function PaperReader({ paper, onBack }: PaperReaderProps) {
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [dismissedHtmlError, setDismissedHtmlError] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("md");
+
+  const queryClient = useQueryClient();
+  const editorRef = useRef<NotesEditorHandle>(null);
 
   // Query hooks
   const {
@@ -34,10 +31,14 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     isLoading: isLoadingHtml,
     error: htmlError,
   } = usePaperHtmlQuery(paper);
-  const { data: initialNotes, isLoading: isLoadingNotes } = usePaperNotesQuery(
-    paper.path,
-    paper.metadata.title,
-  );
+
+  // Notes via custom hook with optimistic updates
+  const {
+    notes,
+    isLoading: isLoadingNotes,
+    updateNotes,
+    hasPendingChanges,
+  } = useNotes(paper.path, paper.metadata.title);
 
   // Annotations via React Query with optimistic updates
   const {
@@ -57,82 +58,26 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     return null;
   }, [actionError, htmlError, dismissedHtmlError]);
 
-  // Mutation hooks
-  const saveNotesMutation = useSaveNotesMutation();
-
-  // Ref to track pending save timeout
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Ref to track if notes have been modified
-  const notesModifiedRef = useRef(false);
-  // Ref to track current notes value (not state to avoid re-renders)
-  const currentNotesRef = useRef<string>("");
-
-  // Sync initial notes to ref
-  useEffect(() => {
-    if (initialNotes) {
-      currentNotesRef.current = initialNotes;
-    }
-  }, [initialNotes]);
-
-  // Save notes to file
-  const saveNotes = useCallback(
-    async (notesContent: string) => {
-      if (!notesModifiedRef.current) return;
-
-      setIsSaving(true);
-      try {
-        await saveNotesMutation.mutateAsync({
-          paperPath: paper.path,
-          content: notesContent,
-        });
-        setLastSaved(new Date());
-        notesModifiedRef.current = false;
-      } catch (err) {
-        console.error("Failed to save notes:", err);
-        setActionError("Failed to save notes");
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [paper.path, saveNotesMutation],
+  // Query key for notes - used by visibility refetch
+  const notesQueryKey = useMemo(
+    () => queryKeys.paperNotes(paper.path),
+    [paper.path],
   );
 
-  // Handle notes change with debounced auto-save
-  const handleNotesChange = useCallback(
-    (newNotes: string) => {
-      currentNotesRef.current = newNotes;
+  // Refetch notes on visibility regain (e.g., after editing externally)
+  useVisibilityRefetch(
+    useCallback(async () => {
+      // Skip refresh if local unsaved changes exist (local wins)
+      if (hasPendingChanges()) return;
 
-      // Mark as modified if different from initial
-      if (newNotes !== initialNotes) {
-        notesModifiedRef.current = true;
+      // Refetch from disk and refresh editor
+      await queryClient.refetchQueries({ queryKey: notesQueryKey });
+      const freshNotes = queryClient.getQueryData<string>(notesQueryKey);
+      if (freshNotes !== undefined) {
+        editorRef.current?.refresh(freshNotes);
       }
-
-      // Clear existing timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      // Set new timeout for auto-save
-      saveTimeoutRef.current = setTimeout(() => {
-        saveNotes(newNotes);
-      }, AUTO_SAVE_DELAY);
-    },
-    [saveNotes, initialNotes],
+    }, [queryClient, notesQueryKey, hasPendingChanges]),
   );
-
-  // Cleanup timeout on unmount and save any pending changes
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      // Save on unmount if modified (using direct writes for unmount to avoid async issues)
-      if (notesModifiedRef.current) {
-        const notesPath = `${paper.path}/notes.md`;
-        writeTextFile(notesPath, currentNotesRef.current).catch(console.error);
-      }
-    };
-  }, [paper.path]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -219,23 +164,15 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
           </div>
 
           {/* Notes sidebar with its own scroll container */}
-          {initialNotes !== undefined && (
+          {notes !== undefined && (
             <div
               className={`fixed top-0 right-0 bottom-0 w-[40%] border-l border-border bg-background z-10 flex flex-col ${!notesOpen ? "hidden" : ""}`}
             >
-              <div className="z-20 flex items-center justify-between px-4 py-2">
-                {/* Save status indicator */}
-                <div className="text-xs text-muted-foreground/50">
-                  {isSaving
-                    ? "Saving..."
-                    : lastSaved
-                      ? `Saved ${lastSaved.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                      : null}
-                </div>
-              </div>
               <NotesEditor
-                value={initialNotes}
-                onChange={handleNotesChange}
+                key={paper.path}
+                ref={editorRef}
+                value={notes}
+                onChange={updateNotes}
                 className="flex-1 overflow-auto"
                 placeholder="Start writing your notes..."
               />

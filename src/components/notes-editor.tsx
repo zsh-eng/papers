@@ -1,24 +1,28 @@
-import { useEffect, useRef } from "react";
-import { EditorState } from "@codemirror/state";
-import { EditorView, keymap, highlightActiveLine } from "@codemirror/view";
+import { obsidianMode } from "@/lib/codemirror/obsidian-mode";
+import { textSelection } from "@/lib/codemirror/text-selection";
+import { cn } from "@/lib/utils";
 import {
   defaultKeymap,
   history,
   historyKeymap,
-  indentMore,
   indentLess,
+  indentMore,
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
+import { EditorState } from "@codemirror/state";
+import { EditorView, highlightActiveLine, keymap } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
-import { cn } from "@/lib/utils";
-import { obsidianMode } from "@/lib/codemirror/obsidian-mode";
-import { textSelection } from "@/lib/codemirror/text-selection";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
 interface NotesEditorProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
+}
+
+export interface NotesEditorHandle {
+  refresh: (value: string) => void;
 }
 
 // Obsidian-like theme with clean styling and contextual syntax visibility
@@ -226,73 +230,93 @@ const linkClickHandler = EditorView.domEventHandlers({
   },
 });
 
-export function NotesEditor({
-  value: initialValue,
-  onChange,
-  className,
-  placeholder,
-}: NotesEditorProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const onChangeRef = useRef(onChange);
+export const NotesEditor = forwardRef<NotesEditorHandle, NotesEditorProps>(
+  function NotesEditor(
+    { value: initialValue, onChange, className, placeholder },
+    ref,
+  ) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const viewRef = useRef<EditorView | null>(null);
+    const onChangeRef = useRef(onChange);
 
-  // Keep onChange ref updated
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
+    // Keep onChange ref updated
+    useEffect(() => {
+      onChangeRef.current = onChange;
+    }, [onChange]);
 
-  // Initialize editor once on mount - fully uncontrolled after that
-  useEffect(() => {
-    if (!containerRef.current) return;
+    // Expose refresh method via imperative handle
+    useImperativeHandle(ref, () => ({
+      refresh: (value: string) => {
+        const view = viewRef.current;
+        if (!view) return;
+        const currentContent = view.state.doc.toString();
+        if (value !== currentContent) {
+          view.dispatch({
+            changes: { from: 0, to: currentContent.length, insert: value },
+          });
+        }
+      },
+    }));
 
-    const updateListener = EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
-        const newValue = update.state.doc.toString();
-        onChangeRef.current(newValue);
-      }
-    });
+    // Initialize editor once on mount - fully uncontrolled after that
+    useEffect(() => {
+      if (!containerRef.current) return;
 
-    const state = EditorState.create({
-      doc: initialValue,
-      extensions: [
-        vim(),
-        textSelection,
-        highlightActiveLine(),
-        history(),
-        markdown(),
-        obsidianMode,
-        keymap.of([...defaultKeymap, ...historyKeymap]),
-        keymap.of([
-          { key: "Tab", run: indentMore },
-          { key: "Shift-Tab", run: indentLess },
-        ]),
-        obsidianTheme,
-        linkClickHandler,
-        updateListener,
-        EditorView.lineWrapping,
-        placeholder
-          ? EditorView.contentAttributes.of({ "data-placeholder": placeholder })
-          : [],
-      ],
-    });
+      const updateListener = EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          const newValue = update.state.doc.toString();
+          onChangeRef.current(newValue);
+        }
+      });
 
-    const view = new EditorView({
-      state,
-      parent: containerRef.current,
-    });
+      const state = EditorState.create({
+        doc: initialValue,
+        extensions: [
+          vim(),
+          textSelection,
+          highlightActiveLine(),
+          history(),
+          markdown(),
+          obsidianMode,
+          keymap.of([...defaultKeymap, ...historyKeymap]),
+          keymap.of([
+            { key: "Tab", run: indentMore },
+            { key: "Shift-Tab", run: indentLess },
+          ]),
+          obsidianTheme,
+          linkClickHandler,
+          updateListener,
+          EditorView.lineWrapping,
+          placeholder
+            ? EditorView.contentAttributes.of({
+                "data-placeholder": placeholder,
+              })
+            : [],
+        ],
+      });
 
-    return () => {
-      view.destroy();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount - initialValue is intentionally not a dependency
+      const view = new EditorView({
+        state,
+        parent: containerRef.current,
+      });
 
-  return (
-    <div
-      ref={containerRef}
-      className={cn(
-        "h-full overflow-hidden bg-background text-foreground",
-        className,
-      )}
-    />
-  );
-}
+      viewRef.current = view;
+
+      return () => {
+        view.destroy();
+        viewRef.current = null;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only run once on mount - initialValue is intentionally not a dependency
+
+    return (
+      <div
+        ref={containerRef}
+        className={cn(
+          "h-full overflow-hidden bg-background text-foreground",
+          className,
+        )}
+      />
+    );
+  },
+);
