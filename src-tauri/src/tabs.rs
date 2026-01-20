@@ -75,10 +75,7 @@ impl TabManager {
 
     pub fn get_active_index(&self) -> Option<usize> {
         let state = self.state.lock().unwrap();
-        state
-            .tabs
-            .iter()
-            .position(|t| t.id == state.active_tab_id)
+        state.tabs.iter().position(|t| t.id == state.active_tab_id)
     }
 }
 
@@ -112,9 +109,7 @@ fn create_tab_internal(
     let manager = app.state::<TabManager>();
 
     // Get the main window
-    let window = app
-        .get_window("main")
-        .ok_or("Main window not found")?;
+    let window = app.get_window("main").ok_or("Main window not found")?;
 
     // Get window dimensions for positioning
     let size = window.inner_size().map_err(|e| e.to_string())?;
@@ -173,9 +168,7 @@ pub fn create_tab(
     let manager = app.state::<TabManager>();
 
     // Get the main window
-    let window = app
-        .get_window("main")
-        .ok_or("Main window not found")?;
+    let window = app.get_window("main").ok_or("Main window not found")?;
 
     // Get window dimensions for positioning
     let size = window.inner_size().map_err(|e| e.to_string())?;

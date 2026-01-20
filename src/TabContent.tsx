@@ -9,7 +9,7 @@ import { useQuerySync } from "@/hooks/use-query-sync";
 import { useTabState } from "@/hooks/use-tab-state";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { createGlobalCommands } from "@/lib/commands/global-commands";
-import { CommandRegistryProvider } from "@/lib/commands/registry";
+
 import type { MarkdownFile, Paper } from "@/lib/papers";
 import { loadMarkdownFile, loadPaper } from "@/lib/papers";
 import { invoke } from "@tauri-apps/api/core";
@@ -20,7 +20,7 @@ import { useDarkMode } from "./hooks/use-theme";
  * Inner component that uses the command registry.
  * Must be wrapped in CommandRegistryProvider.
  */
-function TabContentInner() {
+export function TabContent() {
   const params = new URLSearchParams(window.location.search);
   const initialTabType = params.get("type") || "home";
   const paperPath = params.get("path");
@@ -251,17 +251,5 @@ function TabContentInner() {
       />
       {palettes}
     </>
-  );
-}
-
-/**
- * TabContent is rendered inside each child webview.
- * It reads the tab type and paper path from URL params.
- */
-export function TabContent() {
-  return (
-    <CommandRegistryProvider>
-      <TabContentInner />
-    </CommandRegistryProvider>
   );
 }

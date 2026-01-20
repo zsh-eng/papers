@@ -1,9 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
+import { useMemo } from "react";
 import { TabBar } from "@/components/tab-bar";
-import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useCommands } from "@/hooks/use-commands";
+import { useGlobalKeyboardHandler } from "@/hooks/use-keyboard-shortcuts";
 import { useTabState } from "@/hooks/use-tab-state";
 import { useDarkMode } from "@/hooks/use-theme";
 import { useQuerySync } from "@/hooks/use-query-sync";
+import { createShellCommands } from "@/lib/commands/shell-commands";
 
 /**
  * Shell App - renders only in the main webview.
@@ -16,9 +19,23 @@ export function App() {
   // Set up cross-webview query synchronization
   useQuerySync();
 
-  // Set up global keyboard shortcuts for tabs (calls Rust directly)
-  useTabKeyboardShortcuts();
-  useDarkMode();
+  // Subscribe to dark mode changes and get toggle function
+  const { toggle: toggleTheme } = useDarkMode();
+
+  // Register shell commands (tab operations, theme toggle)
+  const shellCommands = useMemo(
+    () =>
+      createShellCommands({
+        tabCount: tabs.length,
+        toggleTheme,
+      }),
+    [tabs.length, toggleTheme],
+  );
+
+  useCommands(shellCommands, [shellCommands]);
+
+  // Set up global keyboard shortcuts (uses command registry)
+  useGlobalKeyboardHandler();
 
   if (isLoading) {
     return (

@@ -35,6 +35,3 @@ export function useGlobalKeyboardHandler() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [registry]);
 }
-
-// Keep the old export name as an alias for backwards compatibility during migration
-export const useTabKeyboardShortcuts = useGlobalKeyboardHandler;
