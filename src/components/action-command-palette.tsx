@@ -93,7 +93,7 @@ export function ActionCommandPalette({
           value={query}
           onValueChange={setQuery}
         />
-        <CommandList className="max-h-80">
+        <CommandList className="max-h-80 pb-1">
           <CommandEmpty>No commands found.</CommandEmpty>
           {results.map((cmd) => (
             <CommandItem
@@ -112,6 +112,14 @@ export function ActionCommandPalette({
             </CommandItem>
           ))}
         </CommandList>
+        <div className="border-t border-border/50 px-3 py-2 text-xs text-muted-foreground flex items-center justify-center">
+          <span>
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">
+              Enter
+            </kbd>{" "}
+            to use
+          </span>
+        </div>
       </Command>
     </CommandDialog>
   );
