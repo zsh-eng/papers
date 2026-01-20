@@ -10,7 +10,6 @@ import { useVisibilityRefetch } from "@/hooks/use-visibility-refetch";
 import type { Paper } from "@/lib/papers";
 import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileText, PanelRightClose } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface PaperReaderProps {

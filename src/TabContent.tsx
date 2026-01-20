@@ -147,10 +147,11 @@ export function TabContent() {
 
   // Set up handler for pool webviews to receive tab params dynamically
   useEffect(() => {
-    (window as unknown as { __setTabParams?: (type: string, encodedPath: string | null) => void }).__setTabParams = (
-      type: string,
-      encodedPath: string | null
-    ) => {
+    (
+      window as unknown as {
+        __setTabParams?: (type: string, encodedPath: string | null) => void;
+      }
+    ).__setTabParams = (type: string, encodedPath: string | null) => {
       const path = encodedPath ? decodeURIComponent(encodedPath) : null;
 
       if (type === "paper" && path) {
