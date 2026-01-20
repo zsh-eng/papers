@@ -5,8 +5,8 @@ import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { useCallback, useEffect, useRef } from "react";
 import { usePaperNotesQuery } from "./use-paper-content";
 
-// Debounce delay for auto-save (ms)
-const AUTO_SAVE_DELAY = 1500;
+// Debounce delay for auto-save (ms) - kept short since we're saving to local disk
+const AUTO_SAVE_DELAY = 300;
 
 /**
  * Hook that manages notes with debounced saving.
