@@ -1,68 +1,40 @@
+import { useCommandRegistry } from "@/lib/commands/registry";
 import { useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { queryClient } from "@/lib/query-client";
 
 /**
- * Hook for handling global keyboard shortcuts for tab management.
- * Calls Rust commands directly - can be used in any webview.
- *
- * Shortcuts:
- * - Cmd/Ctrl + T: New tab
- * - Cmd/Ctrl + W: Close current tab
- * - Cmd/Ctrl + R: Refresh current tab data (invalidate queries)
- * - Cmd/Ctrl + Tab: Next tab
- * - Cmd/Ctrl + Shift + Tab: Previous tab
- * - Cmd + 1-9: Switch to tab by index
+ * Global keyboard shortcut handler.
+ * Listens for all registered command shortcuts and executes them.
  */
-export function useTabKeyboardShortcuts() {
+export function useGlobalKeyboardHandler() {
+  const registry = useCommandRegistry();
+
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
-      const isMod = e.metaKey || e.ctrlKey;
+      // Skip if user is typing in an input (except for command palette shortcut)
+      const target = e.target as HTMLElement;
+      const isInInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
 
-      // Cmd/Ctrl + T: New tab
-      if (isMod && e.key === "t") {
-        e.preventDefault();
-        await invoke("create_tab", {
-          tabType: "home",
-          paperPath: null,
-          title: "Library",
-        });
-        return;
+      if (isInInput) {
+        // Allow command palette shortcut even in inputs
+        const isCommandPalette =
+          (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "p";
+        if (!isCommandPalette) return;
       }
 
-      // Cmd/Ctrl + W: Close active tab
-      if (isMod && e.key === "w") {
+      const command = registry.findByShortcut(e);
+      if (command) {
         e.preventDefault();
-        await invoke("close_active_tab");
-        return;
-      }
-
-      // Cmd/Ctrl + R: Refresh current tab data
-      if (isMod && e.key === "r") {
-        e.preventDefault();
-        queryClient.invalidateQueries();
-        return;
-      }
-
-      // Cmd/Ctrl + Tab / Cmd/Ctrl + Shift + Tab: Cycle tabs
-      if (isMod && e.key === "Tab") {
-        e.preventDefault();
-        await invoke(e.shiftKey ? "prev_tab" : "next_tab");
-        return;
-      }
-
-      // Cmd + 1-9: Switch to specific tab (macOS style, using metaKey only)
-      if (e.metaKey && !e.ctrlKey && !e.altKey) {
-        const num = parseInt(e.key, 10);
-        if (num >= 1 && num <= 9) {
-          e.preventDefault();
-          await invoke("switch_tab_by_index", { index: num - 1 });
-          return;
-        }
+        await registry.execute(command.id);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [registry]);
 }
+
+// Keep the old export name as an alias for backwards compatibility during migration
+export const useTabKeyboardShortcuts = useGlobalKeyboardHandler;

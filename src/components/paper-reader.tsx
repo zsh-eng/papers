@@ -3,12 +3,14 @@ import { NotesEditor, type NotesEditorHandle } from "@/components/notes-editor";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { ViewModeToggle, type ViewMode } from "@/components/view-mode-toggle";
 import { useAnnotations } from "@/hooks/use-annotations";
+import { useCommands } from "@/hooks/use-commands";
 import { useNotes } from "@/hooks/use-notes";
 import { usePaperHtmlQuery } from "@/hooks/use-paper-content";
 import { useVisibilityRefetch } from "@/hooks/use-visibility-refetch";
 import type { Paper } from "@/lib/papers";
 import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
+import { FileText, PanelRightClose } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface PaperReaderProps {
@@ -79,10 +81,28 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
     }, [queryClient, notesQueryKey, hasPendingChanges]),
   );
 
-  // Keyboard shortcuts
+  // Register reader-specific commands via the command registry
+  useCommands(
+    [
+      {
+        id: "reader.toggleSidebar",
+        title: "Toggle Sidebar",
+        shortcut: { key: "b", modifiers: ["cmd"] },
+        execute: () => setNotesOpen((prev) => !prev),
+      },
+      {
+        id: "reader.toggleViewMode",
+        title: "Toggle PDF/Markdown View",
+        shortcut: { key: "m", modifiers: ["cmd", "shift"] },
+        execute: () => setViewMode((prev) => (prev === "md" ? "pdf" : "md")),
+      },
+    ],
+    [setNotesOpen, setViewMode],
+  );
+
+  // Escape key to go back - kept separate since it's context-sensitive
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Esc to go back - only if nothing is focused (no active element with input/textarea/contenteditable)
       if (e.key === "Escape") {
         const activeElement = document.activeElement;
         const isInputFocused =
@@ -94,18 +114,6 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         if (!isInputFocused && activeElement === document.body) {
           onBack();
         }
-      }
-
-      // Cmd/Ctrl + B to toggle sidebar
-      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
-        e.preventDefault();
-        setNotesOpen((prev) => !prev);
-      }
-
-      // Cmd/Ctrl + Shift + P to toggle PDF/MD view
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "p") {
-        e.preventDefault();
-        setViewMode((prev) => (prev === "md" ? "pdf" : "md"));
       }
     };
 

@@ -1,40 +1,44 @@
+import { ActionCommandPalette } from "@/components/action-command-palette";
 import { CommandPalette } from "@/components/command-palette";
 import { MarkdownReader } from "@/components/markdown-reader";
 import { PaperLibrary } from "@/components/paper-library";
 import { PaperReader } from "@/components/paper-reader";
-import { useCommandPalette } from "@/hooks/use-command-palette";
-import { useTabKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useCommands } from "@/hooks/use-commands";
+import { useGlobalKeyboardHandler } from "@/hooks/use-keyboard-shortcuts";
 import { useQuerySync } from "@/hooks/use-query-sync";
+import { useTabState } from "@/hooks/use-tab-state";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { createGlobalCommands } from "@/lib/commands/global-commands";
+import { CommandRegistryProvider } from "@/lib/commands/registry";
 import type { MarkdownFile, Paper } from "@/lib/papers";
-import { loadPaper, loadMarkdownFile } from "@/lib/papers";
+import { loadMarkdownFile, loadPaper } from "@/lib/papers";
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDarkMode } from "./hooks/use-theme";
 
 /**
- * TabContent is rendered inside each child webview.
- * It reads the tab type and paper path from URL params.
+ * Inner component that uses the command registry.
+ * Must be wrapped in CommandRegistryProvider.
  */
-export function TabContent() {
+function TabContentInner() {
   const params = new URLSearchParams(window.location.search);
   const initialTabType = params.get("type") || "home";
   const paperPath = params.get("path");
 
   const { workspacePath, isLoading: isWorkspaceLoading } = useWorkspace();
+  const { tabs } = useTabState();
 
   // Set up cross-webview query synchronization
   useQuerySync();
 
-  // Subscribe to dark mode changes
-  useDarkMode();
+  // Subscribe to dark mode changes and get toggle function
+  const { toggle: toggleTheme } = useDarkMode();
 
-  // Register tab keyboard shortcuts (shared hook, calls Rust directly)
-  useTabKeyboardShortcuts();
+  // Quick Open (file search) palette state
+  const [quickOpenOpen, setQuickOpenOpen] = useState(false);
 
-  // Command palette state (Cmd+P)
-  const { open: commandPaletteOpen, onOpenChange: setCommandPaletteOpen } =
-    useCommandPalette();
+  // Action command palette state
+  const [actionPaletteOpen, setActionPaletteOpen] = useState(false);
 
   // SPA state for in-tab navigation
   const [view, setView] = useState<"home" | "paper" | "markdown">(
@@ -50,6 +54,34 @@ export function TabContent() {
   const [isMarkdownLoading, setIsMarkdownLoading] = useState(
     initialTabType === "markdown" && !!paperPath,
   );
+
+  // Handle back navigation from paper reader (SPA navigation)
+  const handleBack = useCallback(async () => {
+    setView("home");
+    setCurrentPaper(null);
+    setCurrentMarkdown(null);
+    // Update tab title back to Library
+    await invoke("update_current_tab_title", { title: "Library" });
+  }, []);
+
+  // Register global commands
+  const globalCommands = useMemo(
+    () =>
+      createGlobalCommands({
+        tabCount: tabs.length,
+        view,
+        toggleTheme,
+        goToLibrary: handleBack,
+        openQuickOpen: () => setQuickOpenOpen(true),
+        openActionPalette: () => setActionPaletteOpen(true),
+      }),
+    [tabs.length, view, toggleTheme, handleBack],
+  );
+
+  useCommands(globalCommands, [globalCommands]);
+
+  // Global keyboard handler (uses command registry)
+  useGlobalKeyboardHandler();
 
   // Load paper data when this is a paper tab (initial load from URL)
   useEffect(() => {
@@ -159,15 +191,6 @@ export function TabContent() {
     [],
   );
 
-  // Handle back navigation from paper reader (SPA navigation)
-  const handleBack = useCallback(async () => {
-    setView("home");
-    setCurrentPaper(null);
-    setCurrentMarkdown(null);
-    // Update tab title back to Library
-    await invoke("update_current_tab_title", { title: "Library" });
-  }, []);
-
   // Loading states or workspace not ready
   if (
     isWorkspaceLoading ||
@@ -182,17 +205,28 @@ export function TabContent() {
     );
   }
 
+  // Common palettes rendered in all views
+  const palettes = (
+    <>
+      <CommandPalette
+        open={quickOpenOpen}
+        onOpenChange={setQuickOpenOpen}
+        onSelectPaper={handleSelectPaper}
+        onSelectMarkdown={handleSelectMarkdown}
+      />
+      <ActionCommandPalette
+        open={actionPaletteOpen}
+        onOpenChange={setActionPaletteOpen}
+      />
+    </>
+  );
+
   // Paper view
   if (view === "paper" && currentPaper) {
     return (
       <>
         <PaperReader paper={currentPaper} onBack={handleBack} />
-        <CommandPalette
-          open={commandPaletteOpen}
-          onOpenChange={setCommandPaletteOpen}
-          onSelectPaper={handleSelectPaper}
-          onSelectMarkdown={handleSelectMarkdown}
-        />
+        {palettes}
       </>
     );
   }
@@ -202,12 +236,7 @@ export function TabContent() {
     return (
       <>
         <MarkdownReader markdown={currentMarkdown} onBack={handleBack} />
-        <CommandPalette
-          open={commandPaletteOpen}
-          onOpenChange={setCommandPaletteOpen}
-          onSelectPaper={handleSelectPaper}
-          onSelectMarkdown={handleSelectMarkdown}
-        />
+        {palettes}
       </>
     );
   }
@@ -220,12 +249,19 @@ export function TabContent() {
         onSelectPaper={handleSelectPaper}
         onSelectMarkdown={handleSelectMarkdown}
       />
-      <CommandPalette
-        open={commandPaletteOpen}
-        onOpenChange={setCommandPaletteOpen}
-        onSelectPaper={handleSelectPaper}
-        onSelectMarkdown={handleSelectMarkdown}
-      />
+      {palettes}
     </>
+  );
+}
+
+/**
+ * TabContent is rendered inside each child webview.
+ * It reads the tab type and paper path from URL params.
+ */
+export function TabContent() {
+  return (
+    <CommandRegistryProvider>
+      <TabContentInner />
+    </CommandRegistryProvider>
   );
 }

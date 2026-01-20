@@ -98,7 +98,7 @@ export function TabBar({
 }: TabBarProps) {
   return (
     <div
-      className="tab-bar fixed top-0 left-0 right-0 h-[var(--titlebar-height)] flex items-center z-50 bg-muted"
+      className="tab-bar fixed top-0 left-0 right-0 h-(--titlebar-height) flex items-center z-50 bg-muted"
       role="tablist"
     >
       {/* Traffic light safe area spacer */}
