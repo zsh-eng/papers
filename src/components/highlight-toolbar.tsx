@@ -98,6 +98,7 @@ export function HighlightToolbar({
         "border border-border rounded-full",
         "shadow-lg shadow-black/10",
         "animate-in fade-in-0 zoom-in-95 duration-150",
+        "transition-opacity",
       )}
       style={{
         left: clampedPosition.x,
@@ -115,7 +116,7 @@ export function HighlightToolbar({
             className={cn(
               // Base circle styling
               "w-7 h-7 rounded-full",
-              "transition-all duration-150 ease-out",
+              "transition-color transition-opacity duration-150 ease-out",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               // Hover effect
               "hover:scale-110",
