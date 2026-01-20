@@ -218,7 +218,7 @@ html.no-transition body,
 
 /* Custom titlebar for Tauri - macOS overlay style */
 :root {
-  --titlebar-height: 34px;
+  --titlebar-height: 36px;
   --traffic-light-padding: 78px;
   /* Space for macOS traffic lights */
 }

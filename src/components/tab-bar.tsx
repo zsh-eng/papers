@@ -98,12 +98,11 @@ export function TabBar({
 }: TabBarProps) {
   return (
     <div
-      className="tab-bar fixed top-0 left-0 right-0 h-(--titlebar-height) flex items-center z-50 bg-muted"
+      className="tab-bar fixed top-0 left-0 right-0 flex items-center z-50 bg-muted h-(--titlebar-height) pt-1"
       role="tablist"
     >
       {/* Traffic light safe area spacer */}
-      <div className="flex-shrink-0 w-[var(--traffic-light-padding)]" />
-
+      <div className="shrink-0 w-(--traffic-light-padding)" />
       {/* Tabs container - no gap, fills available space */}
       <div className="relative flex items-center flex-1 overflow-x-auto no-scrollbar px-1 gap-0.5">
         {tabs.map((tab, index) => (
@@ -117,9 +116,8 @@ export function TabBar({
           />
         ))}
       </div>
-
       {/* New tab button */}
-      <div className="relative flex-shrink-0 px-2">
+      <div className="relative shrink-0 px-2">
         <Button
           variant="ghost"
           size="icon-xs"
