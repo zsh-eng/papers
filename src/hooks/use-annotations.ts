@@ -9,10 +9,7 @@ import {
 import { broadcastInvalidation } from "@/lib/query-invalidation";
 import { queryKeys } from "@/lib/query-keys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
-
-// Debounce delay for auto-save (ms)
-const AUTO_SAVE_DELAY = 1500;
+import { useCallback } from "react";
 
 /**
  * Query hook for fetching paper annotations.
@@ -128,8 +125,9 @@ export function useDeleteAnnotationMutation(paperPath: string) {
 }
 
 /**
- * Hook that manages annotations with debounced saving.
+ * Hook that manages annotations with immediate saving.
  * Uses React Query cache as the source of truth with optimistic updates.
+ * Annotations are discrete actions (create/delete/update) so no debouncing needed.
  */
 export function useAnnotations(paperPath: string) {
   const queryClient = useQueryClient();
@@ -141,22 +139,11 @@ export function useAnnotations(paperPath: string) {
     error,
   } = useAnnotationsQuery(paperPath);
 
-  // Refs for debounced saving
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSaveRef = useRef(false);
-  const latestAnnotationsRef = useRef<Annotation[]>(annotations);
-
-  // Keep ref in sync with query data
-  useEffect(() => {
-    latestAnnotationsRef.current = annotations;
-  }, [annotations]);
-
-  // Save function
-  const saveToFile = useCallback(
-    async (annotationsToSave: Annotation[]) => {
+  // Save and broadcast invalidation
+  const saveAndBroadcast = useCallback(
+    async (newAnnotations: Annotation[]) => {
       try {
-        await saveAnnotations(paperPath, annotationsToSave);
-        pendingSaveRef.current = false;
+        await saveAnnotations(paperPath, newAnnotations);
         broadcastInvalidation(queryKey);
       } catch (err) {
         console.error("Failed to save annotations:", err);
@@ -165,22 +152,6 @@ export function useAnnotations(paperPath: string) {
       }
     },
     [paperPath, queryKey, queryClient],
-  );
-
-  // Debounced save trigger
-  const scheduleSave = useCallback(
-    (newAnnotations: Annotation[]) => {
-      pendingSaveRef.current = true;
-      latestAnnotationsRef.current = newAnnotations;
-
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      saveTimeoutRef.current = setTimeout(() => {
-        saveToFile(latestAnnotationsRef.current);
-      }, AUTO_SAVE_DELAY);
-    },
-    [saveToFile],
   );
 
   // Create annotation handler
@@ -196,53 +167,38 @@ export function useAnnotations(paperPath: string) {
         position,
       };
 
-      // Optimistic update
-      const newAnnotations = [...latestAnnotationsRef.current, newAnnotation];
+      const current = queryClient.getQueryData<Annotation[]>(queryKey) ?? [];
+      const newAnnotations = [...current, newAnnotation];
       queryClient.setQueryData<Annotation[]>(queryKey, newAnnotations);
-      scheduleSave(newAnnotations);
+      saveAndBroadcast(newAnnotations);
     },
-    [queryClient, queryKey, scheduleSave],
+    [queryClient, queryKey, saveAndBroadcast],
   );
 
   // Delete annotation handler
   const deleteAnnotation = useCallback(
     (id: string) => {
-      const newAnnotations = latestAnnotationsRef.current.filter(
-        (ann) => ann.id !== id,
-      );
+      const current = queryClient.getQueryData<Annotation[]>(queryKey) ?? [];
+      const newAnnotations = current.filter((ann) => ann.id !== id);
       queryClient.setQueryData<Annotation[]>(queryKey, newAnnotations);
-      scheduleSave(newAnnotations);
+      saveAndBroadcast(newAnnotations);
     },
-    [queryClient, queryKey, scheduleSave],
+    [queryClient, queryKey, saveAndBroadcast],
   );
 
   // Update annotation handler
   const updateAnnotation = useCallback(
     (id: string, updates: Partial<Pick<Annotation, "color" | "note">>) => {
       const now = new Date().toISOString();
-      const newAnnotations = latestAnnotationsRef.current.map((ann) =>
+      const current = queryClient.getQueryData<Annotation[]>(queryKey) ?? [];
+      const newAnnotations = current.map((ann) =>
         ann.id === id ? { ...ann, ...updates, updatedAt: now } : ann,
       );
       queryClient.setQueryData<Annotation[]>(queryKey, newAnnotations);
-      scheduleSave(newAnnotations);
+      saveAndBroadcast(newAnnotations);
     },
-    [queryClient, queryKey, scheduleSave],
+    [queryClient, queryKey, saveAndBroadcast],
   );
-
-  // Cleanup on unmount - save any pending changes
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      if (pendingSaveRef.current) {
-        // Sync save on unmount
-        saveAnnotations(paperPath, latestAnnotationsRef.current).catch(
-          console.error,
-        );
-      }
-    };
-  }, [paperPath]);
 
   return {
     annotations,
