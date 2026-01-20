@@ -616,6 +616,10 @@ html.no-transition body,
   /* magenta-800 */
 }
 
+mark {
+  color: inherit;
+}
+
 .annotation-highlight[data-color="yellow"] {
   background-color: var(--highlight-yellow);
 }
