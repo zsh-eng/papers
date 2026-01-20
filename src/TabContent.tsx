@@ -145,6 +145,69 @@ export function TabContent() {
     }
   }, [initialTabType, paperPath]);
 
+  // Set up handler for pool webviews to receive tab params dynamically
+  useEffect(() => {
+    (window as unknown as { __setTabParams?: (type: string, encodedPath: string | null) => void }).__setTabParams = (
+      type: string,
+      encodedPath: string | null
+    ) => {
+      const path = encodedPath ? decodeURIComponent(encodedPath) : null;
+
+      if (type === "paper" && path) {
+        setIsPaperLoading(true);
+        loadPaper(path)
+          .then((loadedPaper) => {
+            if (loadedPaper) {
+              setCurrentPaper(loadedPaper);
+              setView("paper");
+              const title = loadedPaper.metadata.title || loadedPaper.id;
+              invoke("update_current_tab_title", { title });
+            } else {
+              console.error("Paper not found at path:", path);
+              setView("home");
+              invoke("update_current_tab_title", { title: "Library" });
+            }
+          })
+          .catch((err: unknown) => {
+            console.error("Failed to load paper:", err);
+            setView("home");
+            invoke("update_current_tab_title", { title: "Library" });
+          })
+          .finally(() => {
+            setIsPaperLoading(false);
+          });
+      } else if (type === "markdown" && path) {
+        setIsMarkdownLoading(true);
+        loadMarkdownFile(path)
+          .then((loadedMarkdown) => {
+            if (loadedMarkdown) {
+              setCurrentMarkdown(loadedMarkdown);
+              setView("markdown");
+              const title = loadedMarkdown.metadata.title;
+              invoke("update_current_tab_title", { title });
+            } else {
+              console.error("Markdown not found at path:", path);
+              setView("home");
+              invoke("update_current_tab_title", { title: "Library" });
+            }
+          })
+          .catch((err: unknown) => {
+            console.error("Failed to load markdown:", err);
+            setView("home");
+            invoke("update_current_tab_title", { title: "Library" });
+          })
+          .finally(() => {
+            setIsMarkdownLoading(false);
+          });
+      }
+      // For "home" type - already showing home, nothing to do
+    };
+
+    return () => {
+      delete (window as unknown as { __setTabParams?: unknown }).__setTabParams;
+    };
+  }, []);
+
   // Handle paper selection from library (SPA navigation, no Rust call)
   const handleSelectPaper = useCallback(
     async (selectedPaper: Paper, openInNewTab: boolean) => {

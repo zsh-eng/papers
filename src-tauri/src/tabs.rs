@@ -4,6 +4,8 @@ use tauri::webview::WebviewBuilder;
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl};
 use uuid::Uuid;
 
+use crate::pool::{self, WebviewPool};
+
 pub const TAB_BAR_HEIGHT: f64 = 38.0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,17 +97,33 @@ fn get_webview_url(tab_type: &str, paper_path: Option<&str>) -> WebviewUrl {
     WebviewUrl::App(url.into())
 }
 
-pub fn create_initial_tab(app: &AppHandle) -> Result<(), String> {
-    create_tab_internal(app, "home", None, "Library".to_string())
+/// Configure a pooled webview by calling __setTabParams via eval.
+fn configure_pooled_webview(
+    webview: &Webview,
+    tab_type: &str,
+    paper_path: Option<&str>,
+) -> Result<(), String> {
+    let encoded_path = paper_path
+        .map(|p| urlencoding::encode(p).to_string())
+        .map(|s| format!("\"{}\"", s))
+        .unwrap_or_else(|| "null".to_string());
+
+    let script = format!(
+        "if (window.__setTabParams) {{ window.__setTabParams(\"{}\", {}); }}",
+        tab_type, encoded_path
+    );
+
+    webview.eval(&script).map_err(|e| e.to_string())
 }
 
-fn create_tab_internal(
+/// Create a tab using the pool if available, otherwise fall back to fresh creation.
+fn create_tab_with_pool(
     app: &AppHandle,
     tab_type: &str,
     paper_path: Option<String>,
     title: String,
-) -> Result<(), String> {
-    let tab_id = format!("tab-{}", Uuid::new_v4());
+) -> Result<String, String> {
+    let pool = app.state::<WebviewPool>();
     let manager = app.state::<TabManager>();
 
     // Get the main window
@@ -126,22 +144,34 @@ fn create_tab_internal(
         }
     }
 
-    // Create the webview URL
-    let url = get_webview_url(tab_type, paper_path.as_deref());
+    let tab_id: String;
 
-    // Create WebviewBuilder
-    let webview_builder = WebviewBuilder::new(&tab_id, url);
+    // Try to claim from pool
+    if let Some(pool_label) = pool.claim() {
+        log::info!("Claimed webview from pool: {}", pool_label);
 
-    // Add the webview as a child of the main window
-    let position = LogicalPosition::new(0.0, TAB_BAR_HEIGHT);
-    let webview_size = LogicalSize::new(width, height);
+        if let Some(webview) = app.get_webview(&pool_label) {
+            // Configure the pooled webview for the requested content
+            configure_pooled_webview(&webview, tab_type, paper_path.as_deref())?;
 
-    let webview = window
-        .add_child(webview_builder, position, webview_size)
-        .map_err(|e| e.to_string())?;
+            // Show and focus the webview
+            let _ = webview.show();
+            let _ = webview.set_focus();
 
-    // Focus the new webview
-    let _ = webview.set_focus();
+            tab_id = pool_label;
+        } else {
+            // Pool webview not found, create fresh
+            log::warn!("Pool webview not found, creating fresh");
+            tab_id = create_fresh_webview(app, tab_type, paper_path.as_deref(), &window, width, height)?;
+        }
+
+        // Trigger pool replenishment asynchronously
+        pool::replenish_pool(app.clone());
+    } else {
+        // Pool empty, create fresh webview
+        log::info!("Pool empty, creating fresh webview");
+        tab_id = create_fresh_webview(app, tab_type, paper_path.as_deref(), &window, width, height)?;
+    }
 
     // Add tab to state
     let tab_info = TabInfo {
@@ -149,6 +179,58 @@ fn create_tab_internal(
         tab_type: tab_type.to_string(),
         paper_path,
         title,
+    };
+    manager.add_tab(tab_info);
+    manager.set_active(&tab_id);
+
+    emit_tab_state(app);
+    Ok(tab_id)
+}
+
+/// Create a fresh webview (non-pooled).
+fn create_fresh_webview(
+    _app: &AppHandle,
+    tab_type: &str,
+    paper_path: Option<&str>,
+    window: &tauri::Window,
+    width: f64,
+    height: f64,
+) -> Result<String, String> {
+    let tab_id = format!("tab-{}", Uuid::new_v4());
+
+    let url = get_webview_url(tab_type, paper_path);
+    let webview_builder = WebviewBuilder::new(&tab_id, url);
+
+    let position = LogicalPosition::new(0.0, TAB_BAR_HEIGHT);
+    let webview_size = LogicalSize::new(width, height);
+
+    let webview = window
+        .add_child(webview_builder, position, webview_size)
+        .map_err(|e| e.to_string())?;
+
+    let _ = webview.set_focus();
+
+    Ok(tab_id)
+}
+
+/// Create the initial tab at startup (before pool is initialized).
+pub fn create_initial_tab(app: &AppHandle) -> Result<(), String> {
+    let manager = app.state::<TabManager>();
+    let window = app.get_window("main").ok_or("Main window not found")?;
+
+    let size = window.inner_size().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().unwrap_or(1.0);
+
+    let width = size.width as f64 / scale;
+    let height = (size.height as f64 / scale) - TAB_BAR_HEIGHT;
+
+    let tab_id = create_fresh_webview(app, "home", None, &window, width, height)?;
+
+    let tab_info = TabInfo {
+        id: tab_id.clone(),
+        tab_type: "home".to_string(),
+        paper_path: None,
+        title: "Library".to_string(),
     };
     manager.add_tab(tab_info);
     manager.set_active(&tab_id);
@@ -164,56 +246,7 @@ pub fn create_tab(
     paper_path: Option<String>,
     title: String,
 ) -> Result<String, String> {
-    let tab_id = format!("tab-{}", Uuid::new_v4());
-    let manager = app.state::<TabManager>();
-
-    // Get the main window
-    let window = app.get_window("main").ok_or("Main window not found")?;
-
-    // Get window dimensions for positioning
-    let size = window.inner_size().map_err(|e| e.to_string())?;
-    let scale = window.scale_factor().unwrap_or(1.0);
-
-    let width = size.width as f64 / scale;
-    let height = (size.height as f64 / scale) - TAB_BAR_HEIGHT;
-
-    // Hide currently active tab's webview if it exists
-    let current_active = manager.get_state().active_tab_id;
-    if !current_active.is_empty() {
-        if let Some(current_webview) = app.get_webview(&current_active) {
-            let _ = current_webview.hide();
-        }
-    }
-
-    // Create the webview URL
-    let url = get_webview_url(&tab_type, paper_path.as_deref());
-
-    // Create WebviewBuilder
-    let webview_builder = WebviewBuilder::new(&tab_id, url);
-
-    // Add the webview as a child of the main window
-    let position = LogicalPosition::new(0.0, TAB_BAR_HEIGHT);
-    let webview_size = LogicalSize::new(width, height);
-
-    let webview = window
-        .add_child(webview_builder, position, webview_size)
-        .map_err(|e| e.to_string())?;
-
-    // Focus the new webview
-    let _ = webview.set_focus();
-
-    // Add tab to state
-    let tab_info = TabInfo {
-        id: tab_id.clone(),
-        tab_type,
-        paper_path,
-        title,
-    };
-    manager.add_tab(tab_info);
-    manager.set_active(&tab_id);
-
-    emit_tab_state(&app);
-    Ok(tab_id)
+    create_tab_with_pool(&app, &tab_type, paper_path, title)
 }
 
 #[tauri::command]
@@ -383,9 +416,10 @@ pub fn close_active_tab(app: AppHandle) -> Result<(), String> {
     close_tab(app, state.active_tab_id)
 }
 
-/// Helper function for menu event - creates a new home tab
+/// Helper function for menu event - creates a new home tab using the pool.
 pub fn create_tab_internal_from_menu(app: &AppHandle) -> Result<(), String> {
-    create_tab_internal(app, "home", None, "Library".to_string())
+    create_tab_with_pool(app, "home", None, "Library".to_string())?;
+    Ok(())
 }
 
 /// Helper function for menu event - closes active tab or window if single tab

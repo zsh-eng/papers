@@ -1,7 +1,10 @@
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{LogicalSize, Manager};
 
+mod pool;
 mod tabs;
+
+use pool::WebviewPool;
 use tabs::{
     close_active_tab, close_tab, create_tab, get_tab_state, next_tab, prev_tab, switch_tab,
     switch_tab_by_index, update_current_tab_title, TabManager, TAB_BAR_HEIGHT,
@@ -15,6 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(TabManager::new())
+        .manage(WebviewPool::new())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -95,6 +99,9 @@ pub fn run() {
             let handle = app.handle().clone();
             tabs::create_initial_tab(&handle)?;
 
+            // Initialize the webview pool
+            pool::initialize_pool(&handle);
+
             // Set up window resize listener to resize all child webviews
             let app_handle = app.handle().clone();
             if let Some(window) = app.get_window("main") {
@@ -115,6 +122,15 @@ pub fn run() {
                         for tab in &state.tabs {
                             if let Some(webview) = app_handle.get_webview(&tab.id) {
                                 let _ = webview.set_size(new_size);
+                            }
+                        }
+
+                        // Resize pool webviews too
+                        if let Some(window) = app_handle.get_window("main") {
+                            for webview in window.webviews() {
+                                if webview.label().starts_with("pool-") {
+                                    let _ = webview.set_size(new_size);
+                                }
                             }
                         }
                     }
