@@ -66,7 +66,7 @@ export function useToggleThemeMutation() {
  */
 export function useDarkMode() {
   const { data: theme, isLoading } = useThemeQuery();
-  const toggleMutation = useToggleThemeMutation();
+  const { mutate: toggleTheme } = useToggleThemeMutation();
 
   const isDark = theme === "dark";
   const isLoaded = !isLoading;
@@ -103,9 +103,9 @@ export function useDarkMode() {
   const toggle = useMemo(
     () => () => {
       const newTheme = isDark ? "light" : "dark";
-      toggleMutation.mutate(newTheme);
+      toggleTheme(newTheme);
     },
-    [isDark, toggleMutation],
+    [isDark, toggleTheme],
   );
 
   return { isDark, toggle, isLoaded };
