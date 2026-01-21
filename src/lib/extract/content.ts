@@ -62,6 +62,12 @@ For any figures or images, insert a simple placeholder: [Figure N here]`;
   return prompt;
 }
 
+function fixBlockMath(text: string) {
+  // Match lines that start with $$ and end with $$
+  // They need to be separated by blank lines for Katex to work properly
+  return text.replace(/^\$\$(.+)\$\$$/gm, "\n$$$$\n$1\n$$$$\n");
+}
+
 /**
  * Extract content from a PDF file as plain markdown.
  *
@@ -119,6 +125,7 @@ export async function extractContent(
   if (markdown.endsWith("```")) {
     markdown = markdown.slice(0, -3);
   }
+  markdown = fixBlockMath(markdown);
 
   return markdown.trim();
 }
