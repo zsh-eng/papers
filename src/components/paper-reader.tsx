@@ -20,7 +20,7 @@ interface PaperReaderProps {
 export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [dismissedHtmlError, setDismissedHtmlError] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("md");
 
   const queryClient = useQueryClient();
