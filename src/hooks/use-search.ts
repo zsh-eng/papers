@@ -115,7 +115,7 @@ export function useSearch({
     return () => {
       CSS.highlights?.delete("search-results");
     };
-  }, [matchCount]);
+  }, [matchCount, query]);
 
   // Update the current match highlight and scroll to it
   useEffect(() => {
@@ -155,7 +155,7 @@ export function useSearch({
         }
       }
     }
-  }, [currentMatchIndex, matchCount, containerRef]);
+  }, [currentMatchIndex, matchCount, query, containerRef]);
 
   const nextMatch = useCallback(() => {
     if (matchCount === 0) return;
