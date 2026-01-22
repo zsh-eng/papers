@@ -29,6 +29,7 @@ export function createGlobalCommands(options: {
       id: "tab.new",
       title: "New Tab",
       shortcut: { key: "t", modifiers: ["cmd"] },
+      allowInInput: true,
       execute: () =>
         invoke("create_tab", {
           tabType: "home",
@@ -40,12 +41,14 @@ export function createGlobalCommands(options: {
       id: "tab.close",
       title: "Close Tab",
       shortcut: { key: "w", modifiers: ["cmd"] },
+      allowInInput: true,
       execute: () => invoke("close_active_tab"),
     },
     {
       id: "tab.next",
       title: "Next Tab",
       shortcut: { key: "Tab", modifiers: ["cmd"] },
+      allowInInput: true,
       when: () => tabCount > 1,
       execute: () => invoke("next_tab"),
     },
@@ -53,6 +56,7 @@ export function createGlobalCommands(options: {
       id: "tab.previous",
       title: "Previous Tab",
       shortcut: { key: "Tab", modifiers: ["cmd", "shift"] },
+      allowInInput: true,
       when: () => tabCount > 1,
       execute: () => invoke("prev_tab"),
     },
@@ -60,6 +64,7 @@ export function createGlobalCommands(options: {
       id: "tab.refresh",
       title: "Refresh",
       shortcut: { key: "r", modifiers: ["cmd"] },
+      allowInInput: true,
       execute: () => queryClient.invalidateQueries(),
     },
 
@@ -83,12 +88,14 @@ export function createGlobalCommands(options: {
       id: "navigation.openQuickOpen",
       title: "Quick Open",
       shortcut: { key: "p", modifiers: ["cmd"] },
+      allowInInput: true,
       execute: openQuickOpen,
     },
     {
       id: "navigation.openCommandPalette",
       title: "Command Palette",
       shortcut: { key: "p", modifiers: ["cmd", "shift"] },
+      allowInInput: true,
       execute: openActionPalette,
     },
   ];
@@ -99,6 +106,7 @@ export function createGlobalCommands(options: {
       id: `tab.goTo${i + 1}`,
       title: `Go to Tab ${i + 1}`,
       shortcut: { key: String(i + 1), modifiers: ["cmd"] as Modifier[] },
+      allowInInput: true,
       when: () => tabCount > 1 && tabCount > i,
       execute: () => invoke("switch_tab_by_index", { index: i }),
     });

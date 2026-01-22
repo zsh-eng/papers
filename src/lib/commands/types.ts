@@ -14,4 +14,6 @@ export interface Command {
   icon?: LucideIcon;
   when?: () => boolean; // Return false to hide command
   execute: () => void | Promise<void>;
+  /** If true, shortcut works even when focused in input/textarea/contenteditable */
+  allowInInput?: boolean;
 }

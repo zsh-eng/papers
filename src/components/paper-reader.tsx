@@ -97,6 +97,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         id: "reader.toggleSidebar",
         title: "Toggle Sidebar",
         shortcut: { key: "b", modifiers: ["cmd"] },
+        allowInInput: true,
         execute: () => setNotesOpen((prev) => !prev),
       },
       {

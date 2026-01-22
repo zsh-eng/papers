@@ -10,25 +10,21 @@ export function useGlobalKeyboardHandler() {
 
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
-      // Skip if user is typing in an input (except for command palette shortcut)
+      const command = registry.findByShortcut(e);
+      if (!command) return;
+
+      // Check if user is in an input field
       const target = e.target as HTMLElement;
       const isInInput =
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable;
 
-      if (isInInput) {
-        // Allow command palette shortcut even in inputs
-        const isCommandPalette =
-          (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "p";
-        if (!isCommandPalette) return;
-      }
+      // Skip if in input and command doesn't allow it
+      if (isInInput && !command.allowInInput) return;
 
-      const command = registry.findByShortcut(e);
-      if (command) {
-        e.preventDefault();
-        await registry.execute(command.id);
-      }
+      e.preventDefault();
+      await registry.execute(command.id);
     };
 
     window.addEventListener("keydown", handleKeyDown);
