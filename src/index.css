@@ -635,3 +635,22 @@ mark {
 .annotation-highlight[data-color="magenta"] {
   background-color: var(--highlight-magenta);
 }
+
+/* Search result highlights using CSS Custom Highlights API */
+::highlight(search-results) {
+  background-color: rgba(255, 230, 0, 0.4);
+  color: inherit;
+}
+
+::highlight(search-results-current) {
+  background-color: rgba(255, 150, 0, 0.6);
+  color: inherit;
+}
+
+.dark ::highlight(search-results) {
+  background-color: rgba(255, 200, 0, 0.3);
+}
+
+.dark ::highlight(search-results-current) {
+  background-color: rgba(255, 150, 0, 0.5);
+}

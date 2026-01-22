@@ -1,11 +1,13 @@
 import { ArticleViewer } from "@/components/article-viewer";
 import { NotesEditor, type NotesEditorHandle } from "@/components/notes-editor";
 import { PdfViewer } from "@/components/pdf-viewer";
+import { SearchBar } from "@/components/search-bar";
 import { ViewModeToggle, type ViewMode } from "@/components/view-mode-toggle";
 import { useAnnotations } from "@/hooks/use-annotations";
 import { useCommands } from "@/hooks/use-commands";
 import { useNotes } from "@/hooks/use-notes";
 import { usePaperHtmlQuery } from "@/hooks/use-paper-content";
+import { useSearch } from "@/hooks/use-search";
 import { useVisibilityRefetch } from "@/hooks/use-visibility-refetch";
 import type { Paper } from "@/lib/papers";
 import { queryKeys } from "@/lib/query-keys";
@@ -22,9 +24,17 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
   const [dismissedHtmlError, setDismissedHtmlError] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("md");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const editorRef = useRef<NotesEditorHandle>(null);
+  const articleContentRef = useRef<HTMLDivElement>(null);
+
+  // Search hook for find-in-page
+  const search = useSearch({
+    containerRef: articleContentRef,
+    onClose: () => setSearchOpen(false),
+  });
 
   // Query hooks
   const {
@@ -95,8 +105,15 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         shortcut: { key: "m", modifiers: ["cmd", "shift"] },
         execute: () => setViewMode((prev) => (prev === "md" ? "pdf" : "md")),
       },
+      {
+        id: "reader.find",
+        title: "Find in Page",
+        shortcut: { key: "f", modifiers: ["cmd"] },
+        when: () => viewMode === "md",
+        execute: () => setSearchOpen(true),
+      },
     ],
-    [setNotesOpen, setViewMode],
+    [setNotesOpen, setViewMode, viewMode],
   );
 
   // Escape key to go back - kept separate since it's context-sensitive
@@ -160,6 +177,7 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
                 title={paper.metadata.title}
                 authors={paper.metadata.authors}
                 className="pb-32 px-6 paper-scroll-container"
+                contentRef={articleContentRef}
                 annotations={annotations}
                 onAnnotationCreate={handleAnnotationCreate}
                 onAnnotationDelete={handleAnnotationDelete}
@@ -186,6 +204,19 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
             </div>
           )}
         </>
+      )}
+
+      {/* Search bar */}
+      {searchOpen && viewMode === "md" && (
+        <SearchBar
+          query={search.query}
+          onQueryChange={search.setQuery}
+          matchCount={search.matchCount}
+          currentMatchIndex={search.currentMatchIndex}
+          onNext={search.nextMatch}
+          onPrevious={search.previousMatch}
+          onClose={search.close}
+        />
       )}
     </div>
   );

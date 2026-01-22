@@ -22,6 +22,8 @@ interface ArticleViewerProps {
   /** Article authors (from frontmatter) */
   authors?: string[];
   className?: string;
+  /** Ref to the content container (for search) */
+  contentRef?: React.RefObject<HTMLDivElement | null>;
   /** Annotations to display */
   annotations?: Annotation[];
   /** Callback when a new annotation is created */
@@ -80,12 +82,15 @@ export function ArticleViewer({
   title,
   authors,
   className,
+  contentRef: externalContentRef,
   annotations = [],
   onAnnotationCreate,
   onAnnotationDelete,
   onAnnotationUpdate,
 }: ArticleViewerProps) {
-  const contentRef = useRef<HTMLDivElement>(null);
+  const internalContentRef = useRef<HTMLDivElement>(null);
+  // Use external ref if provided, otherwise use internal ref
+  const contentRef = externalContentRef ?? internalContentRef;
   const [toolbar, setToolbar] = useState<ToolbarState | null>(null);
   const pendingSelectionRef = useRef<TextPosition | null>(null);
 
