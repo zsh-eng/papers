@@ -27,7 +27,7 @@ export function useSearch({
   const [matchCount, setMatchCount] = useState(0);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
 
-  // Store ranges so we can scroll to them
+  // Store ranges in ref (for DOM access in effects without triggering re-renders)
   const rangesRef = useRef<Range[]>([]);
 
   // Collect all text nodes from the container
@@ -51,60 +51,71 @@ export function useSearch({
     return textNodes;
   }, [containerRef]);
 
-  // Find all matches and create highlights
-  useEffect(() => {
-    // Check for CSS Custom Highlights API support
-    if (!CSS.highlights) {
-      console.warn("CSS Custom Highlights API not supported");
-      return;
-    }
+  // Compute ranges and update state - wrapped to batch state updates
+  const updateSearch = useCallback(
+    (newQuery: string) => {
+      if (!CSS.highlights) return;
 
-    // Clear previous highlights
-    CSS.highlights.delete("search-results");
-    CSS.highlights.delete("search-results-current");
-    rangesRef.current = [];
-    setMatchCount(0);
-    setCurrentMatchIndex(-1);
-
-    // Bail out if no query
-    const searchStr = query.trim().toLowerCase();
-    if (!searchStr) {
-      return;
-    }
-
-    const textNodes = getTextNodes();
-    const ranges: Range[] = [];
-
-    // Find all occurrences in text nodes
-    for (const textNode of textNodes) {
-      const text = textNode.textContent?.toLowerCase() || "";
-      let startPos = 0;
-
-      while (startPos < text.length) {
-        const index = text.indexOf(searchStr, startPos);
-        if (index === -1) break;
-
-        const range = new Range();
-        range.setStart(textNode, index);
-        range.setEnd(textNode, index + searchStr.length);
-        ranges.push(range);
-
-        startPos = index + searchStr.length;
+      const searchStr = newQuery.trim().toLowerCase();
+      if (!searchStr) {
+        rangesRef.current = [];
+        setMatchCount(0);
+        setCurrentMatchIndex(-1);
+        return;
       }
-    }
 
-    rangesRef.current = ranges;
-    setMatchCount(ranges.length);
+      const textNodes = getTextNodes();
+      const foundRanges: Range[] = [];
 
+      for (const textNode of textNodes) {
+        const text = textNode.textContent?.toLowerCase() || "";
+        let startPos = 0;
+
+        while (startPos < text.length) {
+          const index = text.indexOf(searchStr, startPos);
+          if (index === -1) break;
+
+          const range = new Range();
+          range.setStart(textNode, index);
+          range.setEnd(textNode, index + searchStr.length);
+          foundRanges.push(range);
+
+          startPos = index + searchStr.length;
+        }
+      }
+
+      rangesRef.current = foundRanges;
+      setMatchCount(foundRanges.length);
+      setCurrentMatchIndex(foundRanges.length > 0 ? 0 : -1);
+    },
+    [getTextNodes],
+  );
+
+  // Wrapped setQuery that also triggers search update
+  const setQueryAndSearch = useCallback(
+    (newQuery: string) => {
+      setQuery(newQuery);
+      updateSearch(newQuery);
+    },
+    [updateSearch],
+  );
+
+  // Register CSS highlights when matchCount changes (side effect only)
+  useEffect(() => {
+    if (!CSS.highlights) return;
+
+    CSS.highlights.delete("search-results");
+
+    const ranges = rangesRef.current;
     if (ranges.length > 0) {
-      // Register all matches highlight
       const allHighlight = new Highlight(...ranges);
       CSS.highlights.set("search-results", allHighlight);
-
-      // Set current to first match
-      setCurrentMatchIndex(0);
     }
-  }, [query, getTextNodes]);
+
+    return () => {
+      CSS.highlights?.delete("search-results");
+    };
+  }, [matchCount]);
 
   // Update the current match highlight and scroll to it
   useEffect(() => {
@@ -144,7 +155,7 @@ export function useSearch({
         }
       }
     }
-  }, [currentMatchIndex, containerRef]);
+  }, [currentMatchIndex, matchCount, containerRef]);
 
   const nextMatch = useCallback(() => {
     if (matchCount === 0) return;
@@ -171,7 +182,7 @@ export function useSearch({
 
   return {
     query,
-    setQuery,
+    setQuery: setQueryAndSearch,
     matchCount,
     currentMatchIndex,
     nextMatch,
