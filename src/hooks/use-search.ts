@@ -30,6 +30,28 @@ export function useSearch({
   // Store ranges in ref (for DOM access in effects without triggering re-renders)
   const rangesRef = useRef<Range[]>([]);
 
+  // Force a repaint on the container (needed for CSS Highlights API updates to render)
+  const forceRepaint = useCallback(() => {
+    const container = containerRef.current;
+    if (container) {
+      // Toggle transform to force GPU layer repaint
+      container.style.transform = "translateZ(0)";
+      requestAnimationFrame(() => {
+        container.style.transform = "";
+      });
+    }
+  }, [containerRef]);
+
+  // Clear all highlights synchronously
+  const clearHighlights = useCallback(() => {
+    if (CSS.highlights) {
+      CSS.highlights.delete("search-results");
+      CSS.highlights.delete("search-results-current");
+    }
+    rangesRef.current = [];
+    forceRepaint();
+  }, [forceRepaint]);
+
   // Collect all text nodes from the container
   const getTextNodes = useCallback((): Text[] => {
     const container = containerRef.current;
@@ -58,7 +80,7 @@ export function useSearch({
 
       const searchStr = newQuery.trim().toLowerCase();
       if (!searchStr) {
-        rangesRef.current = [];
+        clearHighlights();
         setMatchCount(0);
         setCurrentMatchIndex(-1);
         return;
@@ -88,7 +110,7 @@ export function useSearch({
       setMatchCount(foundRanges.length);
       setCurrentMatchIndex(foundRanges.length > 0 ? 0 : -1);
     },
-    [getTextNodes],
+    [getTextNodes, clearHighlights],
   );
 
   // Wrapped setQuery that also triggers search update
@@ -114,8 +136,9 @@ export function useSearch({
 
     return () => {
       CSS.highlights?.delete("search-results");
+      forceRepaint();
     };
-  }, [matchCount, query]);
+  }, [matchCount, query, forceRepaint]);
 
   // Update the current match highlight and scroll to it
   useEffect(() => {
@@ -154,8 +177,16 @@ export function useSearch({
           });
         }
       }
+    } else {
+      // No current match - force repaint to clear stale highlight
+      forceRepaint();
     }
-  }, [currentMatchIndex, matchCount, query, containerRef]);
+
+    return () => {
+      CSS.highlights?.delete("search-results-current");
+      // forceRepaint();
+    };
+  }, [currentMatchIndex, matchCount, query, containerRef, forceRepaint]);
 
   const nextMatch = useCallback(() => {
     if (matchCount === 0) return;
@@ -168,17 +199,12 @@ export function useSearch({
   }, [matchCount]);
 
   const close = useCallback(() => {
-    // Clear highlights
-    if (CSS.highlights) {
-      CSS.highlights.delete("search-results");
-      CSS.highlights.delete("search-results-current");
-    }
-    rangesRef.current = [];
+    clearHighlights();
     setQuery("");
     setMatchCount(0);
     setCurrentMatchIndex(-1);
     onClose?.();
-  }, [onClose]);
+  }, [onClose, clearHighlights]);
 
   return {
     query,
