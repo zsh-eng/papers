@@ -13,6 +13,7 @@ export function createGlobalCommands(options: {
   goToLibrary: () => void;
   openQuickOpen: () => void;
   openActionPalette: () => void;
+  openFileSearch: () => void;
 }): Command[] {
   const {
     tabCount,
@@ -21,6 +22,7 @@ export function createGlobalCommands(options: {
     goToLibrary,
     openQuickOpen,
     openActionPalette,
+    openFileSearch,
   } = options;
 
   const commands: Command[] = [
@@ -97,6 +99,13 @@ export function createGlobalCommands(options: {
       shortcut: { key: "p", modifiers: ["cmd", "shift"] },
       allowInInput: true,
       execute: openActionPalette,
+    },
+    {
+      id: "navigation.openFileSearch",
+      title: "Open File",
+      shortcut: { key: "o", modifiers: ["cmd"] },
+      allowInInput: true,
+      execute: openFileSearch,
     },
   ];
 

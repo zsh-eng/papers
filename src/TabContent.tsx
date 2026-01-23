@@ -1,5 +1,6 @@
 import { ActionCommandPalette } from "@/components/action-command-palette";
 import { CommandPalette } from "@/components/command-palette";
+import { FileSearchPalette } from "@/components/file-search-palette";
 import { MarkdownReader } from "@/components/markdown-reader";
 import { PaperLibrary } from "@/components/paper-library";
 import { PaperReader } from "@/components/paper-reader";
@@ -40,6 +41,9 @@ export function TabContent() {
   // Action command palette state
   const [actionPaletteOpen, setActionPaletteOpen] = useState(false);
 
+  // File search palette state
+  const [fileSearchOpen, setFileSearchOpen] = useState(false);
+
   // SPA state for in-tab navigation
   const [view, setView] = useState<"home" | "paper" | "markdown">(
     initialTabType as "home" | "paper" | "markdown",
@@ -74,6 +78,7 @@ export function TabContent() {
         goToLibrary: handleBack,
         openQuickOpen: () => setQuickOpenOpen(true),
         openActionPalette: () => setActionPaletteOpen(true),
+        openFileSearch: () => setFileSearchOpen(true),
       }),
     [tabs.length, view, toggleTheme, handleBack],
   );
@@ -281,6 +286,10 @@ export function TabContent() {
       <ActionCommandPalette
         open={actionPaletteOpen}
         onOpenChange={setActionPaletteOpen}
+      />
+      <FileSearchPalette
+        open={fileSearchOpen}
+        onOpenChange={setFileSearchOpen}
       />
     </>
   );
