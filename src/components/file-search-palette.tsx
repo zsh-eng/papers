@@ -9,7 +9,25 @@ import {
 } from "@/components/ui/command";
 import { searchFiles, type FileSearchResult } from "@/lib/file-search";
 import { invoke } from "@tauri-apps/api/core";
+import { debounce } from "lodash-es";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+// Debounced search function - defined outside component
+const debouncedSearchFiles = debounce(
+  async (
+    query: string,
+    onSuccess: (results: FileSearchResult[]) => void,
+    onError: (err: unknown) => void,
+  ) => {
+    try {
+      const results = await searchFiles(query);
+      onSuccess(results);
+    } catch (err) {
+      onError(err);
+    }
+  },
+  50,
+);
 
 interface FileSearchPaletteProps {
   open: boolean;
@@ -22,28 +40,31 @@ export function FileSearchPalette({
 }: FileSearchPaletteProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<FileSearchResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Debounced search (reads from cached index, so should be fast)
+  // Only search when query is non-empty
   useEffect(() => {
     if (!open) return;
 
-    const timer = setTimeout(async () => {
-      setIsLoading(true);
-      try {
-        const searchResults = await searchFiles(query);
+    // Clear results immediately when query is empty
+    if (query.trim() === "") {
+      setResults([]);
+      setSelectedId(null);
+      return;
+    }
+
+    debouncedSearchFiles(
+      query,
+      (searchResults) => {
         setResults(searchResults);
-        setSelectedId(searchResults[0]?.path ?? null);
-      } catch (err) {
+      },
+      (err) => {
         console.error("File search failed:", err);
         setResults([]);
-      } finally {
-        setIsLoading(false);
-      }
-    }, 100);
+      },
+    );
 
-    return () => clearTimeout(timer);
+    return () => debouncedSearchFiles.cancel();
   }, [query, open]);
 
   // Reset state when closing
@@ -128,32 +149,26 @@ export function FileSearchPalette({
           onValueChange={setQuery}
         />
         <CommandList className="max-h-80">
-          {isLoading ? (
-            <div className="py-6 text-center text-sm text-muted-foreground">
-              Searching...
-            </div>
-          ) : (
-            <>
-              <CommandEmpty>No files found.</CommandEmpty>
-              <CommandGroup>
-                {results.map((result) => (
-                  <CommandItem
-                    key={result.path}
-                    value={result.path}
-                    onSelect={() => handleSelect(result)}
-                    className="flex flex-col items-start gap-0.5"
-                  >
-                    <span className="truncate w-full font-medium">
-                      {result.path.split("/").pop()}
-                    </span>
-                    <span className="truncate w-full text-xs text-muted-foreground">
-                      {result.display_path}
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          )}
+          <CommandEmpty>
+            {query.trim() === "" ? "Type to search..." : "No files found."}
+          </CommandEmpty>
+          <CommandGroup>
+            {results.map((result) => (
+              <CommandItem
+                key={result.path}
+                value={result.path}
+                onSelect={() => handleSelect(result)}
+                className="flex flex-col items-start gap-0.5"
+              >
+                <span className="truncate w-full font-medium">
+                  {result.path.split("/").pop()}
+                </span>
+                <span className="truncate w-full text-xs text-muted-foreground">
+                  {result.display_path}
+                </span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
         </CommandList>
         <div className="border-t border-border/50 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
           <span>
