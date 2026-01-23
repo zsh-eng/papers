@@ -1,6 +1,7 @@
 import { HIGHLIGHT_COLORS, type AnnotationColor } from "@/lib/annotations";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
+import { Check, Copy } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 interface HighlightToolbarProps {
   /** Toolbar position (centered on this point) */
@@ -11,10 +12,12 @@ interface HighlightToolbarProps {
   onClose: () => void;
   /** Current highlight color (edit mode) - if set, clicking same color deletes */
   currentColor?: AnnotationColor | null;
+  /** Text to copy when copy button is clicked */
+  textToCopy?: string;
 }
 
-const TOOLBAR_WIDTH = 180;
-const TOOLBAR_PADDING = 8;
+const TOOLBAR_WIDTH = 228;
+const TOOLBAR_PADDING = 12;
 
 /**
  * A floating toolbar for creating/editing highlights.
@@ -29,7 +32,35 @@ export function HighlightToolbar({
   onColorSelect,
   onClose,
   currentColor,
+  textToCopy,
 }: HighlightToolbarProps) {
+  const [copied, setCopied] = useState(false);
+
+  // Handle copy to clipboard
+  const handleCopy = useCallback(async () => {
+    if (!textToCopy) return;
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error("Failed to copy text:", err);
+    }
+  }, [textToCopy]);
+
+  // CMD + Shift + C to copy text when the focused
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "c" && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault();
+        handleCopy();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleCopy]);
+
   // Calculate clamped position to keep toolbar in viewport
   const clampedPosition = (() => {
     let x = position.x - TOOLBAR_WIDTH / 2;
@@ -93,7 +124,7 @@ export function HighlightToolbar({
       className={cn(
         "fixed z-50",
         "flex items-center justify-center gap-3",
-        "px-2 py-2",
+        "px-3 py-2",
         "bg-popover/95 backdrop-blur-sm",
         "border border-border rounded-full",
         "shadow-lg shadow-black/10",
@@ -146,6 +177,28 @@ export function HighlightToolbar({
           />
         );
       })}
+
+      {/* Divider */}
+      {textToCopy && <div className="w-px h-5 bg-border/50" />}
+
+      {/* Copy button */}
+      {textToCopy && (
+        <button
+          onClick={handleCopy}
+          className={cn(
+            "w-7 h-7 rounded-full text-muted-foreground",
+            "flex items-center justify-center",
+            "transition-all duration-150 ease-out",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "hover:scale-110 hover:bg-muted",
+            copied && "text-green-500",
+          )}
+          aria-label="Copy text"
+          title={copied ? "Copied!" : "Copy text"}
+        >
+          {copied ? <Check className="size-5" /> : <Copy className="size-5" />}
+        </button>
+      )}
     </div>
   );
 }

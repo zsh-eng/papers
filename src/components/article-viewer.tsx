@@ -180,12 +180,24 @@ export function ArticleViewer({
     });
   }, []);
 
-  // Get current annotation color for edit mode
-  const currentAnnotationColor = useMemo(() => {
+  // Get current annotation for edit mode
+  const currentAnnotation = useMemo(() => {
     if (toolbar?.mode !== "edit" || !toolbar.annotationId) return null;
-    const annotation = annotations.find((a) => a.id === toolbar.annotationId);
-    return annotation?.color ?? null;
+    return annotations.find((a) => a.id === toolbar.annotationId) ?? null;
   }, [toolbar, annotations]);
+
+  const currentAnnotationColor = currentAnnotation?.color ?? null;
+
+  // Get text to copy based on toolbar mode
+  const textToCopy = useMemo(() => {
+    if (toolbar?.mode === "create") {
+      return pendingSelectionRef.current?.selectedText;
+    }
+    if (toolbar?.mode === "edit" && currentAnnotation) {
+      return currentAnnotation.position.selectedText;
+    }
+    return undefined;
+  }, [toolbar?.mode, currentAnnotation]);
 
   // Handle color selection (create or edit)
   const handleColorSelect = useCallback(
@@ -246,6 +258,7 @@ export function ArticleViewer({
           onColorSelect={handleColorSelect}
           onClose={handleToolbarClose}
           currentColor={currentAnnotationColor}
+          textToCopy={textToCopy}
         />
       )}
     </div>
