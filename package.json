@@ -36,6 +36,7 @@
     "@tauri-apps/plugin-opener": "^2.5.3",
     "@tauri-apps/plugin-store": "~2",
     "@zsh-eng/text-highlighter": "^0.3.0",
+    "arg": "^5.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
