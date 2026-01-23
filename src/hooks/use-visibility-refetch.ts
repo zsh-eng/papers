@@ -1,32 +1,34 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef } from "react";
 
 /**
- * Hook that calls a callback when the document becomes visible after being hidden.
- * Useful for refreshing data when the user returns to the tab/window.
+ * Hook that calls a callback when the window regains focus.
+ * Useful for refreshing data when the user returns to the application.
  */
-export function useVisibilityRefetch(onVisible: () => void) {
-  const wasHiddenRef = useRef(false);
-  const onVisibleRef = useRef(onVisible);
+export function useVisibilityRefetch(onFocus: () => void) {
+  const wasFocusedRef = useRef(true);
+  const onFocusRef = useRef(onFocus);
 
   // Keep callback ref updated
   useEffect(() => {
-    onVisibleRef.current = onVisible;
-  }, [onVisible]);
+    onFocusRef.current = onFocus;
+  }, [onFocus]);
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        wasHiddenRef.current = true;
-      } else if (wasHiddenRef.current) {
-        // Document became visible after being hidden
-        wasHiddenRef.current = false;
-        onVisibleRef.current();
-      }
-    };
+    const unlisten = getCurrentWindow().onFocusChanged(
+      ({ payload: focused }) => {
+        if (!focused) {
+          wasFocusedRef.current = false;
+        } else if (!wasFocusedRef.current) {
+          // Window regained focus after losing it
+          wasFocusedRef.current = true;
+          onFocusRef.current();
+        }
+      },
+    );
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      unlisten.then((fn) => fn());
     };
   }, []);
 }

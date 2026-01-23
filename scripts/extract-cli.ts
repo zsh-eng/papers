@@ -27,6 +27,7 @@
  *   bun run scripts/extract-cli.ts full chapter.pdf -o ~/papers -c "Smith (2020). Chapter 3."
  */
 
+import arg from "arg";
 import { existsSync } from "fs";
 import { copyFile, mkdir, readFile, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
@@ -140,37 +141,40 @@ ${colors.cyan}Environment:${colors.reset}
 `);
 }
 
-function parseArgs(args: string[]): {
+function parseArgs(argv: string[]): {
   command: string;
   pdfPath: string;
   outputDir: string;
   context: string;
 } {
-  let command = "";
-  let pdfPath = "";
-  let outputDir = "";
-  let context = "";
+  const args = arg(
+    {
+      // Types
+      "--output-dir": String,
+      "--context": String,
+      "--help": Boolean,
 
-  let i = 0;
-  while (i < args.length) {
-    const arg = args[i];
+      // Aliases
+      "-o": "--output-dir",
+      "-c": "--context",
+      "-h": "--help",
+    },
+    { argv },
+  );
 
-    if (arg === "--help" || arg === "-h") {
-      printHelp();
-      process.exit(0);
-    } else if (arg === "--output-dir" || arg === "-o") {
-      outputDir = args[++i];
-    } else if (arg === "--context" || arg === "-c") {
-      context = args[++i];
-    } else if (!command) {
-      command = arg;
-    } else if (!pdfPath) {
-      pdfPath = arg;
-    }
-    i++;
+  if (args["--help"]) {
+    printHelp();
+    process.exit(0);
   }
 
-  return { command, pdfPath, outputDir, context };
+  const [command = "", pdfPath = ""] = args._;
+
+  return {
+    command,
+    pdfPath,
+    outputDir: args["--output-dir"] ?? "",
+    context: args["--context"] ?? "",
+  };
 }
 
 /**
