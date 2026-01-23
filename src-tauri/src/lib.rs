@@ -1,9 +1,11 @@
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{LogicalSize, Manager};
 
+mod file_search;
 mod pool;
 mod tabs;
 
+use file_search::{refresh_file_index, refresh_if_stale, search_files, FileIndex};
 use pool::WebviewPool;
 use tabs::{
     close_active_tab, close_tab, create_tab, get_tab_state, next_tab, prev_tab, switch_tab,
@@ -19,6 +21,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(TabManager::new())
         .manage(WebviewPool::new())
+        .manage(FileIndex::new())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -102,9 +105,20 @@ pub fn run() {
             // Initialize the webview pool
             pool::initialize_pool(&handle);
 
+            // Initialize file index (background refresh)
+            refresh_if_stale(&handle, 0);
+
             // Set up window resize listener to resize all child webviews
             let app_handle = app.handle().clone();
+            let app_handle_for_focus = app.handle().clone();
             if let Some(window) = app.get_window("main") {
+                // Refresh file index on window focus (if stale > 30s)
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(true) = event {
+                        refresh_if_stale(&app_handle_for_focus, 30);
+                    }
+                });
+
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::Resized(size) = event {
                         let scale = app_handle
@@ -149,6 +163,8 @@ pub fn run() {
             switch_tab_by_index,
             get_tab_state,
             update_current_tab_title,
+            search_files,
+            refresh_file_index,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
