@@ -108,6 +108,7 @@ export function PaperRow({
 
   const titleClass = cn(
     "flex-1 min-w-0 transition-colors duration-200",
+    "line-clamp-1",
     isHovered
       ? "text-foreground"
       : isAnyHovered
