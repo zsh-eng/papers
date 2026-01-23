@@ -1,6 +1,8 @@
 import { ArticleViewer } from "@/components/article-viewer";
+import { useCommands } from "@/hooks/use-commands";
 import { useMarkdownContentQuery } from "@/hooks/use-markdown-content";
 import type { MarkdownFile } from "@/lib/papers";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEffect, useMemo, useState } from "react";
 
 interface MarkdownReaderProps {
@@ -22,6 +24,18 @@ export function MarkdownReader({ markdown, onBack }: MarkdownReaderProps) {
     if (dismissedError) return null;
     return queryError ? "Failed to load markdown file." : null;
   }, [queryError, dismissedError]);
+
+  // Register reader-specific commands via the command registry
+  useCommands(
+    [
+      {
+        id: "reader.revealInFinder",
+        title: "Reveal in Finder",
+        execute: () => revealItemInDir(markdown.path),
+      },
+    ],
+    [markdown.path],
+  );
 
   // Keyboard shortcuts
   useEffect(() => {

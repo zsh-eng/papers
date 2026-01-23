@@ -12,6 +12,7 @@ import { useVisibilityRefetch } from "@/hooks/use-visibility-refetch";
 import type { Paper } from "@/lib/papers";
 import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface PaperReaderProps {
@@ -113,8 +114,13 @@ export function PaperReader({ paper, onBack }: PaperReaderProps) {
         when: () => viewMode === "md",
         execute: () => setSearchOpen(true),
       },
+      {
+        id: "reader.revealInFinder",
+        title: "Reveal in Finder",
+        execute: () => revealItemInDir(paper.path),
+      },
     ],
-    [setNotesOpen, setViewMode, viewMode],
+    [setNotesOpen, setViewMode, viewMode, paper.path],
   );
 
   // Escape key to go back - kept separate since it's context-sensitive
