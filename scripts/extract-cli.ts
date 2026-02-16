@@ -15,6 +15,7 @@
  *   bun run scripts/extract-cli.ts content <pdf>      # Extract content + render HTML
  *   bun run scripts/extract-cli.ts figures <pdf>      # Extract figure images from bounding boxes
  *   bun run scripts/extract-cli.ts full <pdf>         # Run full pipeline (recommended)
+ *   bun run scripts/extract-cli.ts render <md>        # Re-render HTML from markdown file
  *
  * Options:
  *   --output-dir, -o <dir>   Parent directory for paper folder (default: same as PDF)
@@ -109,6 +110,7 @@ ${colors.cyan}Commands:${colors.reset}
   metadata <pdf>    Extract metadata only (~5-15 seconds)
   content <pdf>     Extract content only (requires metadata first)
   figures <pdf>     Extract figure images (requires metadata first)
+  render <md>       Re-render HTML from a markdown file
 
 ${colors.cyan}Options:${colors.reset}
   --output-dir, -o <dir>   Parent directory for paper folder (default: same as PDF)
@@ -125,6 +127,9 @@ ${colors.cyan}Examples:${colors.reset}
   # With citation context for book chapters
   bun run scripts/extract-cli.ts full chapter.pdf -o ~/papers \\
     -c "Smith, J. (2020). Chapter 3. In Book Title (pp. 45-67). Publisher."
+
+  # Re-render HTML from an existing markdown file
+  bun run scripts/extract-cli.ts render ~/papers/2017-attention/content.md
 
 ${colors.cyan}Output Structure:${colors.reset}
   {year}-{title-slug}/
@@ -365,6 +370,26 @@ async function runFull(pdfPath: string, baseDir: string, context?: string) {
   log(`   ${colors.cyan}${paperDir}${colors.reset}`);
 }
 
+/**
+ * Re-render HTML from an existing markdown file.
+ * Writes the HTML file alongside the markdown file (e.g. content.md -> content.html).
+ */
+async function runRender(mdPath: string) {
+  info(`Reading ${basename(mdPath)}...`);
+  const markdown = await readFile(mdPath, "utf-8");
+
+  info(`Rendering HTML...`);
+  const startTime = Date.now();
+  const html = await renderToHtmlDocument(markdown);
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+  const htmlPath = mdPath.replace(/\.md$/, ".html");
+  await writeFile(htmlPath, html);
+
+  success(`HTML rendered in ${elapsed}s`);
+  log(`   Output: ${htmlPath}`);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const { command, pdfPath, outputDir, context } = parseArgs(args);
@@ -372,6 +397,21 @@ async function main() {
   if (!command || !pdfPath) {
     printHelp();
     process.exit(1);
+  }
+
+  // Render command: takes a markdown file, not a PDF
+  if (command === "render") {
+    if (!existsSync(pdfPath)) {
+      error(`Markdown file not found: ${pdfPath}`);
+      process.exit(1);
+    }
+    try {
+      await runRender(pdfPath);
+    } catch (err) {
+      error(`Render failed: ${err instanceof Error ? err.message : err}`);
+      process.exit(1);
+    }
+    return;
   }
 
   // Validate PDF exists

@@ -7,7 +7,7 @@
 
 import { readFile } from "fs/promises";
 import { z } from "zod";
-import { EXTRACTION_MODEL, getGeminiClient } from "./client";
+import { generateContentWithFallback } from "./client";
 import { metadataResponseSchema } from "./schemas";
 import type { ExtractedMetadata, MetadataOptions } from "./types";
 
@@ -78,8 +78,6 @@ export async function extractMetadata(
 ): Promise<ExtractedMetadata> {
   const { context } = options;
 
-  const client = getGeminiClient();
-
   // Read PDF as base64
   const pdfBuffer = await readFile(pdfPath);
   const pdfBase64 = pdfBuffer.toString("base64");
@@ -93,8 +91,7 @@ export async function extractMetadata(
 
   // Convert Zod schema to JSON Schema for Gemini
   const jsonSchema = z.toJSONSchema(metadataResponseSchema);
-  const response = await client.models.generateContent({
-    model: EXTRACTION_MODEL,
+  const response = await generateContentWithFallback({
     contents: [
       {
         role: "user",
@@ -119,7 +116,15 @@ export async function extractMetadata(
 
   const text = response.text;
   if (!text) {
-    throw new Error("Empty response from Gemini API");
+    const blockReason = response.promptFeedback?.blockReason;
+    const candidate = response.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    const detail = blockReason
+      ? `blocked: ${blockReason}`
+      : finishReason
+        ? `finishReason=${finishReason}`
+        : "no candidates returned";
+    throw new Error(`Empty response from Gemini API (${detail})`);
   }
 
   const parsed = JSON.parse(text);

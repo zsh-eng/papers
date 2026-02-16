@@ -6,7 +6,7 @@
  */
 
 import { readFile } from "fs/promises";
-import { EXTRACTION_MODEL, getGeminiClient } from "./client";
+import { generateContentWithFallback } from "./client";
 import type { ContentOptions, Figure } from "./types";
 
 /**
@@ -81,8 +81,6 @@ export async function extractContent(
 ): Promise<string> {
   const { figures = [] } = options;
 
-  const client = getGeminiClient();
-
   // Read PDF as base64
   const pdfBuffer = await readFile(pdfPath);
   const pdfBase64 = pdfBuffer.toString("base64");
@@ -90,8 +88,7 @@ export async function extractContent(
   const prompt = buildPrompt(figures);
 
   // No structured output - just get plain text markdown
-  const response = await client.models.generateContent({
-    model: EXTRACTION_MODEL,
+  const response = await generateContentWithFallback({
     contents: [
       {
         role: "user",
@@ -112,7 +109,15 @@ export async function extractContent(
 
   const text = response.text;
   if (!text) {
-    throw new Error("Empty response from Gemini API");
+    const blockReason = response.promptFeedback?.blockReason;
+    const candidate = response.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    const detail = blockReason
+      ? `blocked: ${blockReason}`
+      : finishReason
+        ? `finishReason=${finishReason}`
+        : "no candidates returned";
+    throw new Error(`Empty response from Gemini API (${detail})`);
   }
 
   // Clean up any accidental code fence wrapping
