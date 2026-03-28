@@ -8,6 +8,7 @@
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import rehypeStringify from "rehype-stringify";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkParse from "remark-parse";
@@ -24,6 +25,7 @@ function createProcessor() {
   return unified()
     .use(remarkParse)
     .use(remarkGfm)
+    .use(remarkBreaks)
     .use(remarkMath)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeKatex)
