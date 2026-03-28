@@ -71,7 +71,9 @@ fn get_markdown_files_mdfind() -> Result<Vec<String>, String> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout.lines().map(|s| s.to_string()).collect())
+    Ok(stdout.lines()
+        .filter(|line| !line.contains("/node_modules/"))
+        .map(|s| s.to_string()).collect())
 }
 
 /// Refresh the file index in the background
