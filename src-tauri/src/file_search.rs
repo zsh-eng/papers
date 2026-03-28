@@ -56,7 +56,7 @@ fn get_markdown_files_mdfind() -> Result<Vec<String>, String> {
 
     let output = Command::new("mdfind")
         .args([
-            "kMDItemContentType == 'net.daringfireball.markdown'",
+            "kMDItemFSName == '*.md'",
             "-onlyin",
             &home_dir,
         ])
